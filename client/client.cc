@@ -27,14 +27,18 @@ pthread_mutex_t _mutex;
 
 //! \brief Connect to server
 bool ConnectServer();
+
 //! \brief Close connection
 void CloseConnect();
-//! \brief Send request to server
-void SendInfo();
+
+//! \brief Send request to server or message to other clients
+void SendInfo(uint8_t type);
+
 //! \brief Request time
-void RequestInfo();
+// void RequestInfo();
+
 //! \brief Exit the program
-void Exit();
+void ExitProg();
 //! \brief Receive message
 void *ReceiveMessage(void *arg);
 //! \brief Lock or unlock the mutex
@@ -105,64 +109,20 @@ int main()
             cout << "****************************" << endl;
             cout << "Please input your choice: ";
             cin >> _choice;
-            if (_choice == 1)
+            if (_choice >= 1 && _choice <= 4)
             {
-                // Request time
-                // Send request
-                char _request[1024] = "1";
-                send(sock, _request, strlen(_request), 0);
-                // Receive response
-                char rep_message[1024];
-                recv(sock, rep_message, 1024, 0);
-                cout << "Time: " << rep_message << endl;
-            }
-            else if (_choice == 2)
-            {
-                // Request Name
-                // Send request
-                char _request[1024] = "2";
-                send(sock, _request, strlen(_request), 0);
-                // Receive response
-                char rep_message[1024];
-                recv(sock, rep_message, 1024, 0);
-                cout << "Name: " << rep_message << endl;
-            }
-            else if (_choice == 3)
-            {
-                // Request Clients List
-                // Send request
-                char _request[1024] = "3";
-                send(sock, _request, strlen(_request), 0);
-                // Receive response
-                char rep_message[1024];
-                recv(sock, rep_message, 1024, 0);
-                cout << "Clients List: " << rep_message << endl;
-            }
-            else if (_choice == 4)
-            {
-                // Send message
-                // Send request
-                char _request[1024] = "4";
-                send(sock, _request, strlen(_request), 0);
-                // Receive response
-                char rep_message[1024];
-                recv(sock, rep_message, 1024, 0);
-                cout << "Clients List: " << rep_message << endl;
+                // Request time | Name | Clients List | Send message
+                SendInfo(static_cast<uint8_t>(_choice) + 2 << 4);
             }
             else if (_choice == 5)
             {
                 // Close connection
-                // Send request
-                char _request[1024] = "5";
-                send(sock, _request, strlen(_request), 0);
-                // Receive response
-                char rep_message[1024];
-                recv(sock, rep_message, 1024, 0);
-                cout << "Clients List: " << rep_message << endl;
+                CloseConnect();
             }
             else if (_choice == 6)
             {
                 // Exit
+                ExitProg();
                 break;
             }
             else
@@ -258,21 +218,25 @@ void CloseConnect()
 
 }
 
-void SendInfo()
+void SendInfo(uint8_t type)
 {
-    // Input destination client id
-    uint8_t dest_client_id;
-    cout << "Please input destination client id: ";
-    cin >> dest_client_id;
-    cin.clear();
+    uint8_t dest_client_id = 0;
+    string buf = ""; // Max Length - 1021 bytes (1024 - 3)
+    if (type == SEND_MESSAGE)
+    {
+        // Input destination client id
+        cout << "Please input destination client id: ";
+        cin >> dest_client_id;
 
-    // Input Message
-    // A line feed indicates the end of the input
-    string buf; // Max Length - 1021 bytes (1024 - 3)
-    cin >> buf;
+        cin.clear();
 
+        // Input Message
+        // A line feed indicates the end of the inputs
+        cin >> buf;
+    }
+    
     // Send the message
-    MyPacket send_pack = MyPacket(SEND_MESSAGE, dest_client_id, buf);
+    MyPacket send_pack = MyPacket(type, dest_client_id, buf);
     string send_pstr = send_pack.Package();
     send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
@@ -282,9 +246,24 @@ void SendInfo()
     while(true)
     {
         // wait for reply
-        
+        pthread_mutex_lock(&_mutex);
+        if (!_islock)
+        {
+            pthread_mutex_unlock(&_mutex);
+            break;
+        }
+        pthread_mutex_unlock(&_mutex);
+        Sleep(100);
     }
+}
 
+void ExitProg()
+{
+    // Close connection
+    CloseConnect();
+
+    // Exit
+    exit(0);
 }
 
 void *ReceiveMessage(void *arg)
