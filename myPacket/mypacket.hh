@@ -4,6 +4,13 @@
 
 #define SEPERATOR 0b00000000
 #define ENDSIGNAL 0b11111111
+#define MAXLEN 1024
+#define CONNECT 0x10
+#define CLOSE 0x20
+#define REQUEST_TIME 0x30
+#define REQUEST_SERVER_NAME 0x40
+#define REQUEST_CLIENTS_LIST 0x50
+#define SEND_MESSAGE 0x60
 
 class MyPacket
 {
@@ -14,6 +21,7 @@ private:
     //! \details  8th bit is 0 -> Request and Indicate packet
     //! \details  8th bit is 1 -> Response packet
     /*
+    +---0x00 Error
     +---0x10 Connect
     +---0x20 Close
     +---0x30 Request Time
@@ -35,7 +43,7 @@ public:
     uint8_t GetClientId();
     std::string GetMessage();
     void SetPacket(uint8_t type, uint8_t client_id = 0, std::string message = "");
-    std::string toSendPacket();
+    std::string Package();
 };
 
 //! \brief Decode received packet to MyPacket
