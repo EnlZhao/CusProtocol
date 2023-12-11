@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <string>
 #include "../myPacket/mypacket.hh"
+
 using namespace std;
 
 // #pragma comment(lib, "ws2_32.lib")
@@ -20,7 +21,7 @@ pthread_t tid;
 static bool isConnect = false;
 
 
-void ConnectServer();
+bool ConnectServer();
 void Close();
 void SendInfo();
 void RequestInfo();
@@ -31,10 +32,19 @@ void *ReceiveMessage(void *arg);
 int main()
 {
     WSADATA wsaData;
-    
+
+    // Initialize WinSock
     if(WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
         cout << "\033[31mWSAStartup failed! Expect WinSock DLL version 2.2!\033[0m" << endl;
+        return 0;
+    }
+
+    // Affirm WinSock DLL version
+    if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2)
+    {
+        cout << "\033[31mWSAStartup failed! Expect WinSock DLL version 2.2!\033[0m" << endl;
+        WSACleanup();
         return 0;
     }
 
@@ -152,12 +162,12 @@ int main()
     }
 }
 
-void ConnectServer()
+bool ConnectServer()
 {
     if (isConnect)
     {
         cout << "\033[32mYou have already connected to server!\033[0m" << endl;
-        return;
+        return true;
     }
 
     cout << "Please input server IP (Default: 127.0.0.1): " << endl;
@@ -187,22 +197,25 @@ void ConnectServer()
         cout << "\033[31mConnect to server failed!\033[0m" << endl;
         closesocket(clientSocket);
         WSACleanup();
-        return;
+        return false;
     }
     else
     {
         cout << "\033[32mConnect to server successfully!\033[0m" << endl;
         isConnect = true;
+
+        // Create sub thread to receive message
+        if (pthread_create(&tid, NULL, ReceiveMessage, &clientSocket) != 0)
+        {
+            cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
+            return false;
+        }
+
+        // Send a package for connecting successfully
+        MyPacket _pack = MyPacket(0x10, 0, ""); // connect
+        string _pstr = _pack.toSendPacket();   
+        send(clientSocket, _pstr.c_str(), _pstr.size(), 0);
     }
-
-    // Create sub thread to receive message
-    if (pthread_create(&tid, NULL, ReceiveMessage, &clientSocket) != 0)
-    {
-        cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
-        return;
-    }
-
-
 }
 
 void *ReceiveMessage(void *arg)

@@ -14,12 +14,12 @@ private:
     //! \details  8th bit is 0 -> Request and Indicate packet
     //! \details  8th bit is 1 -> Response packet
     /*
-    +---0x00 Connect
-    +---0x10 Close
-    +---0x20 Request Time
-    +---0x30 Request Server Name
-    +---0x40 Request Clients List
-    +---0x50 Send Message
+    +---0x10 Connect
+    +---0x20 Close
+    +---0x30 Request Time
+    +---0x40 Request Server Name
+    +---0x50 Request Clients List
+    +---0x60 Send Message
     */
     uint8_t _type;
 
