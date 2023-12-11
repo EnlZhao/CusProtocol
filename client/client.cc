@@ -13,7 +13,9 @@ using namespace std;
 // g++ test.cc -lwsock32
 
 SOCKET clientSocket;
+sockaddr_in _serverAddr; // server information
 pthread_t tid;
+
 
 static bool isConnect = false;
 
@@ -23,7 +25,7 @@ void Close();
 void SendInfo();
 void RequestInfo();
 void Exit();
-void *ReceiveMessage(void *args);
+void *ReceiveMessage(void *arg);
 
 
 int main()
@@ -171,7 +173,6 @@ void ConnectServer()
     cin.clear();
 
     // Initialize - Set server address
-    sockaddr_in _serverAddr;
     _serverAddr.sin_family = AF_INET;
     _serverAddr.sin_port = htons(_port);
     _serverAddr.sin_addr.S_un.S_addr = inet_addr(_ip.c_str());
@@ -195,13 +196,33 @@ void ConnectServer()
     }
 
     // Create sub thread to receive message
-    if (pthread_create(&tid, NULL, ReceiveMessage, NULL) != 0)
+    if (pthread_create(&tid, NULL, ReceiveMessage, &clientSocket) != 0)
     {
         cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
         return;
     }
-    
 
 
 }
 
+void *ReceiveMessage(void *arg)
+{
+    SOCKET sock = *((SOCKET*)arg);
+    char _response[1024];
+    while (true)
+    {
+        memset(_response, 0, sizeof(_response));
+        int _len = recv(sock, _response, 1024, 0);
+        if (_len <= 0)
+        {
+            cout << "\033[31mServer closed!\033[0m" << endl;
+            break;
+        }
+        else
+        {
+            cout << "\033[32m" << _response << "\033[0m" << endl;
+        }
+    }
+    Close();
+    return NULL;
+}
