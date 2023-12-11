@@ -12,13 +12,18 @@ using namespace std;
 // #pragma comment(lib, "ws2_32.lib")
 // g++ test.cc -lwsock32
 
+SOCKET clientSocket;
+pthread_t tid;
+
 static bool isConnect = false;
 
-void Connect();
+
+void ConnectServer();
 void Close();
 void SendInfo();
 void RequestInfo();
 void Exit();
+void *ReceiveMessage(void *args);
 
 
 int main()
@@ -54,7 +59,7 @@ int main()
             if (_choice == 1)
             {
                 // Connect to server
-                Connect();
+                ConnectServer();
             }
             else if (_choice == 2)
             {
@@ -144,3 +149,59 @@ int main()
         }
     }
 }
+
+void ConnectServer()
+{
+    if (isConnect)
+    {
+        cout << "\033[32mYou have already connected to server!\033[0m" << endl;
+        return;
+    }
+
+    cout << "Please input server IP (Default: 127.0.0.1): " << endl;
+    string _ip;
+    cin >> _ip;
+    // clean buffer
+    cin.clear();
+
+    cout << "Please input server port (Default: 3210): " << endl;
+    uint16_t _port;
+    cin >> _port;
+    // clean buffer
+    cin.clear();
+
+    // Initialize - Set server address
+    sockaddr_in _serverAddr;
+    _serverAddr.sin_family = AF_INET;
+    _serverAddr.sin_port = htons(_port);
+    _serverAddr.sin_addr.S_un.S_addr = inet_addr(_ip.c_str());
+
+    // // print _serverAddr
+    // cout << "Server IP: " << inet_ntoa(_serverAddr.sin_addr) << endl;
+    // cout << "Server Port: " << ntohs(_serverAddr.sin_port) << endl;
+
+    // Connect to server
+    if (connect(clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
+    {
+        cout << "\033[31mConnect to server failed!\033[0m" << endl;
+        closesocket(clientSocket);
+        WSACleanup();
+        return;
+    }
+    else
+    {
+        cout << "\033[32mConnect to server successfully!\033[0m" << endl;
+        isConnect = true;
+    }
+
+    // Create sub thread to receive message
+    if (pthread_create(&tid, NULL, ReceiveMessage, NULL) != 0)
+    {
+        cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
+        return;
+    }
+    
+
+
+}
+
