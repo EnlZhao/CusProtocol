@@ -7,11 +7,18 @@
 #include <windows.h>
 #include <string>
 #include "../myPacket/mypacket.hh"
+using namespace std;
 
-#pragma comment(lib, "ws2_32.lib")
+// #pragma comment(lib, "ws2_32.lib")
+// g++ test.cc -lwsock32
+
 static bool isConnect = false;
 
 void Connect();
+void Close();
+void SendInfo();
+void RequestInfo();
+void Exit();
 
 
 int main()
@@ -20,7 +27,7 @@ int main()
     
     if(WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
-        std::cout << "WSAStartup failed! Expect WinSock DLL version 2.2!\n" << std::endl;
+        cout << "\033[31mWSAStartup failed! Expect WinSock DLL version 2.2!\033[0m" << endl;
         return 0;
     }
 
@@ -28,7 +35,7 @@ int main()
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(sock == INVALID_SOCKET)
     {
-        std::cout << "Initialize Socket failed!" << std::endl;
+        cout << "\033[31mInitialize Socket failed!\033[0m" << endl;
         return 0;
     }
 
@@ -36,14 +43,14 @@ int main()
     {   
         uint16_t _choice;
         // Menu       
-        std::cout << "*********** Menu ***********" << std::endl;
+        cout << "*********** Menu ***********" << endl;
         if(!isConnect)
         {
-            std::cout << "* 1. Connect to server     *" << std::endl;
-            std::cout << "* 2. Exit                  *" << std::endl;
-            std::cout << "****************************" << std::endl;
-            std::cout << "$ Please input your choice: ";
-            std::cin >> _choice;
+            cout << "* 1. Connect to server     *" << endl;
+            cout << "* 2. Exit                  *" << endl;
+            cout << "****************************" << endl;
+            cout << "$ Please input your choice: ";
+            cin >> _choice;
             if (_choice == 1)
             {
                 // Connect to server
@@ -56,20 +63,20 @@ int main()
             }
             else
             {
-                std::cout << " Invalid input!" << std::endl;
+                cout << "\033[31m Invalid input!\033[0m" << endl;
             }
         }
         else
         {
-            std::cout << "* 1. Request time          *" << std::endl;
-            std::cout << "* 2. Request Name          *" << std::endl;
-            std::cout << "* 3. Request Clients List  *" << std::endl;
-            std::cout << "* 4. Send message          *" << std::endl;
-            std::cout << "* 5. Close connection      *" << std::endl;
-            std::cout << "* 6. Exit                  *" << std::endl;
-            std::cout << "****************************" << std::endl;
-            std::cout << "Please input your choice: ";
-            std::cin >> _choice;
+            cout << "* 1. Request time          *" << endl;
+            cout << "* 2. Request Name          *" << endl;
+            cout << "* 3. Request Clients List  *" << endl;
+            cout << "* 4. Send message          *" << endl;
+            cout << "* 5. Close connection      *" << endl;
+            cout << "* 6. Exit                  *" << endl;
+            cout << "****************************" << endl;
+            cout << "Please input your choice: ";
+            cin >> _choice;
             if (_choice == 1)
             {
                 // Request time
@@ -79,7 +86,7 @@ int main()
                 // Receive response
                 char _response[1024];
                 recv(sock, _response, 1024, 0);
-                std::cout << "Time: " << _response << std::endl;
+                cout << "Time: " << _response << endl;
             }
             else if (_choice == 2)
             {
@@ -90,7 +97,7 @@ int main()
                 // Receive response
                 char _response[1024];
                 recv(sock, _response, 1024, 0);
-                std::cout << "Name: " << _response << std::endl;
+                cout << "Name: " << _response << endl;
             }
             else if (_choice == 3)
             {
@@ -101,7 +108,7 @@ int main()
                 // Receive response
                 char _response[1024];
                 recv(sock, _response, 1024, 0);
-                std::cout << "Clients List: " << _response << std::endl;
+                cout << "Clients List: " << _response << endl;
             }
             else if (_choice == 4)
             {
@@ -112,7 +119,7 @@ int main()
                 // Receive response
                 char _response[1024];
                 recv(sock, _response, 1024, 0);
-                std::cout << "Clients List: " << _response << std::endl;
+                cout << "Clients List: " << _response << endl;
             }
             else if (_choice == 5)
             {
@@ -123,7 +130,7 @@ int main()
                 // Receive response
                 char _response[1024];
                 recv(sock, _response, 1024, 0);
-                std::cout << "Clients List: " << _response << std::endl;
+                cout << "Clients List: " << _response << endl;
             }
             else if (_choice == 6)
             {
@@ -132,7 +139,7 @@ int main()
             }
             else
             {
-                std::cout << " Invalid input!" << std::endl;
+                cout << "\033[31m Invalid input!\033[0m" << endl;
             }
         }
     }

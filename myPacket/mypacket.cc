@@ -29,7 +29,7 @@ MyPacket decodeRecPacket(const std::string &packet)
     MyPacket myPacket;
     if (packet.length() < 3)
     {
-        std::cout << "Invalid packet!" << std::endl;
+        std::cout << "\033[31mInvalid packet!\033[0m" << std::endl;
         return MyPacket(0, 0, "Error packet!");
     }
     myPacket.SetPacket(static_cast<uint8_t>(packet[0] & 0xf0), static_cast<uint8_t>(packet[0] & 0x0f), packet.substr(2, packet.length() - 2));
