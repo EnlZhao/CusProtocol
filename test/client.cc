@@ -111,7 +111,7 @@ MyPacket decodeRecPacket(const string &packet)
 // #pragma comment(lib, "ws2_32.lib")
 // g++ test.cc -lwsock32
 
-SOCKET _clientSocket;
+SOCKET _clientSosket;
 sockaddr_in _serverAddr; // server information
 pthread_t _tid;
 
