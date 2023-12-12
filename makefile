@@ -11,6 +11,8 @@ all: client.o server.o
 	mkdir -p exefile
 	g++ client/client.o myPacket/myPacket.o -o ./exefile/client.exe -lpthread -lwsock32
 	g++ server/server.o myPacket/myPacket.o -o ./exefile/server.exe -lpthread -lwsock32
+	# g++ server.cc -o server.exe -lpthread -lwsock32
+	# g++ client.cc -o client.exe -lpthread -lwsock32
 
 clean:
 	rm -f ./**/*.o

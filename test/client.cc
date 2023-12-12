@@ -6,9 +6,97 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <string>
-#include "../myPacket/mypacket.hh"
+// #include "../myPacket/mypacket.hh"
 
 using namespace std;
+
+///////////////////////////////
+#include <string>
+#define SEPERATOR 0b11111111
+#define ENDSIGNAL 0b00000000
+#define MAXLEN 1024
+#define CONNECT 0x10
+#define CLOSE 0x20
+#define REQUEST_TIME 0x30
+#define REQUEST_SERVER_NAME 0x40
+#define REQUEST_CLIENTS_LIST 0x50
+#define SEND_MESSAGE 0x60
+
+class MyPacket
+{
+private:
+
+    //! \brief Represent the type of packet
+    //! \details  Only use high 4 bits
+    //! \details  8th bit is 0 -> Request and Indicate packet
+    //! \details  8th bit is 1 -> Response packet
+    /*
+    +---0x00 Error
+    +---0x10 Connect
+    +---0x20 Close
+    +---0x30 Request Time
+    +---0x40 Request Server Name
+    +---0x50 Request Clients List
+    +---0x60 Send Message
+    */
+    uint8_t _type;
+
+    //! \brief Represent the client id
+    //! \details only use low 4 bits - Max 15 clients (Default all 1 -> 0x0F)
+    uint8_t _client_id;
+
+    string _message;
+public:
+    MyPacket() : _type(0), _client_id(0x0f), _message("") {}
+    MyPacket(uint8_t type, uint8_t client_id = 0x0f, string message= "") : _type(type), _client_id(client_id), _message(message) { }
+    uint8_t GetType();
+    uint8_t GetClientId();
+    string GetMessage();
+    void SetPacket(uint8_t type, uint8_t client_id = 0x0f, string message = "");
+    string Package();
+};
+
+uint8_t MyPacket::GetType() { return _type; }
+
+uint8_t MyPacket::GetClientId() { return _client_id; }
+
+string MyPacket::GetMessage() { return _message; }
+
+void MyPacket::SetPacket(uint8_t type, uint8_t client_id, string message)
+{
+    _type = type;
+    _client_id = client_id;
+    _message = message;
+}
+
+string MyPacket::Package()
+{
+    string packet = "";
+
+    packet.append(1, (_type & 0xf0) | (_client_id & 0x0f));
+    packet.append(1, SEPERATOR);
+    packet += _message;
+    packet.append(1, ENDSIGNAL);
+    return packet;
+}
+
+MyPacket decodeRecPacket(const string &packet)
+{
+    MyPacket myPacket;
+    if (packet.length() < 3 || packet[1] != SEPERATOR || packet[packet.length() - 1] != ENDSIGNAL)
+    {
+        cout << "\033[31mInvalid packet!\033[0m" << endl;
+        return MyPacket(0, 0, "Error packet!");
+    }
+    
+    const size_t _len = (packet.length() > MAXLEN) ? MAXLEN : packet.length();
+    myPacket.SetPacket(static_cast<uint8_t>(packet[0] & 0xf0), static_cast<uint8_t>(packet[0] & 0x0f), packet.substr(2, _len - 2));
+
+    return myPacket;
+}
+
+
+/////////////////////////////
 
 #define LOCK true
 #define UNLOCK false
@@ -159,14 +247,26 @@ bool ConnectServer()
     _serverAddr.sin_addr.S_un.S_addr = inet_addr(server_ip.c_str());
 
     // // print _serverAddr
-    // cout << "Server IP: " << inet_ntoa(_serverAddr.sin_addr) << endl;
-    // cout << "Server Port: " << ntohs(_serverAddr.sin_port) << endl;
+    cout << "Server IP: " << inet_ntoa(_serverAddr.sin_addr) << endl;
+    cout << "Server Port: " << ntohs(_serverAddr.sin_port) << endl;
 
     // Connect to server
     if (connect(clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
     {
         cout << "\033[31mConnect to server failed!\033[0m" << endl;
         closesocket(clientSocket);
+        // 打印错误信息
+        DWORD dwError=WSAGetLastError();
+        LPVOID lpMsgBuf;
+        FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
+            NULL,
+            dwError,
+            MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),
+            (LPTSTR)&lpMsgBuf,
+            0,
+            NULL);
+        cout << (char*)lpMsgBuf << endl;
         WSACleanup();
         return false;
     }
