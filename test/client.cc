@@ -6,15 +6,17 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <string>
+#include <bitset>
 // #include "../myPacket/mypacket.hh"
+#pragma comment(lib, "ws2_32.lib")
 
 using namespace std;
 
 ///////////////////////////////
 #include <string>
-#define SEPERATOR 0b11111111
-#define ENDSIGNAL 0b00000000
+#define ENDSIGNAL 0b11111111
 #define MAXLEN 1024
+// #define ERROR 0x00
 #define CONNECT 0x10
 #define CLOSE 0x20
 #define REQUEST_TIME 0x30
@@ -74,7 +76,6 @@ string MyPacket::Package()
     string packet = "";
 
     packet.append(1, (_type & 0xf0) | (_client_id & 0x0f));
-    packet.append(1, SEPERATOR);
     packet += _message;
     packet.append(1, ENDSIGNAL);
     return packet;
@@ -83,10 +84,16 @@ string MyPacket::Package()
 MyPacket decodeRecPacket(const string &packet)
 {
     MyPacket myPacket;
-    if (packet.length() < 3 || packet[1] != SEPERATOR || packet[packet.length() - 1] != ENDSIGNAL)
+    if (packet.length() < 2 || packet[packet.length() - 1] != ENDSIGNAL)
     {
+        // Print bit type of packet
+        cout << "packet[0]: " << bitset<8>(packet[0]) << endl;
+        cout << "length: " << packet.length() << endl;
+        cout << "packet[final]: " << bitset<8>(packet[packet.length() - 1]) << endl;
+        cout << "packet.length: " << packet.length() << endl;
         cout << "\033[31mInvalid packet!\033[0m" << endl;
-        return MyPacket(0, 0, "Error packet!");
+        cout << "Message: " << packet.substr(2, packet.length() - 3) << endl;
+        return MyPacket(0, 0x0f, "Error packet!");
     }
     
     const size_t _len = (packet.length() > MAXLEN) ? MAXLEN : packet.length();
@@ -114,7 +121,7 @@ static bool _islock = false;
 pthread_mutex_t _mutex;
 
 //! \brief Connect to server
-bool ConnectServer();
+void ConnectServer();
 
 //! \brief Close connection
 void CloseConnect();
@@ -152,8 +159,8 @@ int main()
     }
 
     // Initialize - Apply for socket
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(sock == INVALID_SOCKET)
+    _clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(_clientSocket == INVALID_SOCKET)
     {
         cout << "\033[31mInitialize Socket failed!\033[0m" << endl;
         return 0;
@@ -190,6 +197,8 @@ int main()
         }
         else
         {
+            pthread_mutex_lock(&_mutex);
+
             cout << "* 1. Request time          *" << endl;
             cout << "* 2. Request Name          *" << endl;
             cout << "* 3. Request Clients List  *" << endl;
@@ -201,6 +210,9 @@ int main()
             // cin >> _choice;
             fflush(stdin);
             scanf("%d", &_choice);
+
+            pthread_mutex_unlock(&_mutex);
+            
             if (_choice >= 1 && _choice <= 4)
             {
                 // Request time | Name | Clients List | Send message
@@ -225,12 +237,12 @@ int main()
     }
 }
 
-bool ConnectServer()
+void ConnectServer()
 {
     if (isConnect)
     {
         cout << "\033[32mYou have already connected to server!\033[0m" << endl;
-        return true;
+        return ;
     }
 
     cout << "Please input server IP (Default: 127.0.0.1): \n>> ";
@@ -256,11 +268,9 @@ bool ConnectServer()
     cout << "Server Port: " << ntohs(_serverAddr.sin_port) << endl;
 
     // Connect to server
-    // int ret = connect(_clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr));
-    // cout << ret;
     if (connect(_clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
     {
-        cout << "\033[31mConnect to server failed!\033[0m" << endl;
+        cout << "\033[31mConnect to server failed!" << endl;
 
         // Print Error information
         DWORD dwError=WSAGetLastError();
@@ -273,12 +283,13 @@ bool ConnectServer()
             (LPTSTR)&lpMsgBuf,
             0,
             NULL);
-        cout << (char*)lpMsgBuf << endl;
+        cout << (char*)lpMsgBuf << "\033[0m" << endl;
         LocalFree(lpMsgBuf);
 
-        closesocket(_clientSocket);
-        WSACleanup();
-        return false;
+        // closesocket(_clientSocket);
+        // WSACleanup();
+
+        return ;
     }
     else
     {
@@ -289,15 +300,28 @@ bool ConnectServer()
         if (pthread_create(&_tid, NULL, ReceiveMessage, &_clientSocket) != 0)
         {
             cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
-            return false;
+            return ;
         }
 
         // Send a package for connecting successfully
-        MyPacket send_pack(CONNECT); // connect
+        cout << "\033[32mSend a package for connecting successfully!\033[0m" << endl;
+        // Print Info
+        MyPacket send_pack(CONNECT, 0x0f, ""); // connect
         string send_pstr = send_pack.Package();
+        cout << "send_pack type : " << bitset<8>(send_pack.GetType()) << endl;
+        cout << "send_pack client_id : " << bitset<8>(send_pack.GetClientId()) << endl;
+        cout << "send_pack message : " << send_pack.GetMessage() << endl;
+        cout << "send_pstr : " << endl;
+        // 打印 string 的二进制形式
+        for (auto i : send_pstr)
+        {
+            bitset<8> bs(i);
+            cout << bs << endl;
+        }
+        cout << "send_pstr length: " << send_pstr.length() << endl;
         send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
     }
-    return true;
+    return ;
 }
 
 void CloseConnect()
@@ -309,7 +333,7 @@ void CloseConnect()
     }
 
     // Send a package for closing connection
-    MyPacket send_pack = MyPacket(CLOSE); // close
+    MyPacket send_pack = MyPacket(CLOSE, 0x0f, ""); // close
     string send_pstr = send_pack.Package();
     send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 

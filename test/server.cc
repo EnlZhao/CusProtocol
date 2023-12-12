@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <bitset>
+#pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
 #define SERVERPORT 1638 
@@ -15,9 +17,9 @@ using namespace std;
 
 ///////////////////////////////
 #include <string>
-#define SEPERATOR 0b11111111
-#define ENDSIGNAL 0b00000000
+#define ENDSIGNAL 0b11111111
 #define MAXLEN 1024
+// #define ERROR 0x00
 #define CONNECT 0x10
 #define CLOSE 0x20
 #define REQUEST_TIME 0x30
@@ -59,9 +61,6 @@ public:
     string Package();
 };
 
-//! \brief Decode received packet to MyPacket
-MyPacket decodeRecPacket(const string& packet);
-
 uint8_t MyPacket::GetType() { return _type; }
 
 uint8_t MyPacket::GetClientId() { return _client_id; }
@@ -80,7 +79,6 @@ string MyPacket::Package()
     string packet = "";
 
     packet.append(1, (_type & 0xf0) | (_client_id & 0x0f));
-    packet.append(1, SEPERATOR);
     packet += _message;
     packet.append(1, ENDSIGNAL);
     return packet;
@@ -89,10 +87,16 @@ string MyPacket::Package()
 MyPacket decodeRecPacket(const string &packet)
 {
     MyPacket myPacket;
-    if (packet.length() < 3 || packet[1] != SEPERATOR || packet[packet.length() - 1] != ENDSIGNAL)
+    if (packet.length() < 2 || packet[packet.length() - 1] != ENDSIGNAL)
     {
+        // Print bit type of packet
+        cout << "packet[0]: " << bitset<8>(packet[0]) << endl;
+        cout << "length: " << packet.length() << endl;
+        cout << "packet[final]: " << bitset<8>(packet[packet.length() - 1]) << endl;
+        cout << "packet.length: " << packet.length() << endl;
         cout << "\033[31mInvalid packet!\033[0m" << endl;
-        return MyPacket(0, 0, "Error packet!");
+        cout << "Message: " << packet.substr(2, packet.length() - 3) << endl;
+        return MyPacket(0, 0x0f, "Error packet!");
     }
     
     const size_t _len = (packet.length() > MAXLEN) ? MAXLEN : packet.length();
@@ -100,6 +104,7 @@ MyPacket decodeRecPacket(const string &packet)
 
     return myPacket;
 }
+
 
 
 /////////////////////////////
@@ -144,8 +149,8 @@ int main()
     _sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (_sockfd == -1)
     {
-        cout << "\033[31mFail to create a socket.\033[0m" << endl;
-        // 打印错误信息
+        cout << "\033[31mFail to create a socket." << endl;
+        // Print error information
         DWORD dwError=WSAGetLastError();
         LPVOID lpMsgBuf;
         FormatMessage(
@@ -156,7 +161,7 @@ int main()
             (LPTSTR)&lpMsgBuf,
             0,
             NULL);
-        cout << (char*)lpMsgBuf << endl;
+        cout << (char*)lpMsgBuf << "\033[0m" << endl;
 
         return -1;
     }
@@ -188,6 +193,7 @@ int main()
         SOCKET clientSockfd = accept(_sockfd, (sockaddr *)&clientAddr, (socklen_t *)&clientAddrLen);
         
         pthread_mutex_lock(&_mutex);
+
         // Add to client list
         id clientID = _idQueue;
         _idQueue = (++_idQueue) % 15;
@@ -210,6 +216,7 @@ int main()
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
 
         cout << "\033[32mClient \033[0m" << clientID <<  "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connect successfully!\033[0m" << endl;
+        
         pthread_mutex_unlock(&_mutex);
 
         // Create sub thread to receive message
@@ -241,6 +248,7 @@ void *SubThread(void *arg)
 
         auto pack_type = recv_pack.GetType();
         MyPacket reply_pack;
+
         if (pack_type == REQUEST_TIME)
         {
             time_t rawtime;
@@ -300,7 +308,7 @@ void *SubThread(void *arg)
 
         string reply = reply_pack.Package();
 
-        cout << "\033[32m Reply: \033[0m\n" << reply << endl;
+        cout << "\033[32mReply: \033[0m\n" << reply << endl;
 
         send(clientSockfd, reply.c_str(), reply.size(), 0);
 
