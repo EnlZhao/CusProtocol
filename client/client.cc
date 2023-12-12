@@ -183,10 +183,11 @@ bool ConnectServer()
         }
 
         // Send a package for connecting successfully
-        MyPacket send_pack = MyPacket(CONNECT); // connect
+        MyPacket send_pack(CONNECT); // connect
         string send_pstr = send_pack.Package();
         send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
     }
+    return true;
 }
 
 void CloseConnect()
@@ -314,6 +315,7 @@ void *ReceiveMessage(void *arg)
         }
         LockOrNot(UNLOCK);   
     }
+    return NULL;
 }
 
 void LockOrNot(bool islock)

@@ -2,8 +2,8 @@
 #include <iostream>
 #include <string>
 
-#define SEPERATOR 0b00000000
-#define ENDSIGNAL 0b11111111
+#define SEPERATOR 0b11111111
+#define ENDSIGNAL 0b00000000
 #define MAXLEN 1024
 #define CONNECT 0x10
 #define CLOSE 0x20
@@ -32,17 +32,17 @@ private:
     uint8_t _type;
 
     //! \brief Represent the client id
-    //! \details only use low 4 bits - Max 15 clients (Default all 0 -> 0x00)
+    //! \details only use low 4 bits - Max 15 clients (Default all 1 -> 0x0F)
     uint8_t _client_id;
 
     std::string _message;
 public:
-    MyPacket() : _type(0), _client_id(0), _message("") {}
-    MyPacket(uint8_t type, uint8_t client_id = 0, std::string message) : _type(type), _client_id(client_id), _message(message) { }
+    MyPacket() : _type(0), _client_id(0x0f), _message("") {}
+    MyPacket(uint8_t type, uint8_t client_id = 0x0f, std::string message= "") : _type(type), _client_id(client_id), _message(message) { }
     uint8_t GetType();
     uint8_t GetClientId();
     std::string GetMessage();
-    void SetPacket(uint8_t type, uint8_t client_id = 0, std::string message = "");
+    void SetPacket(uint8_t type, uint8_t client_id = 0x0f, std::string message = "");
     std::string Package();
 };
 
