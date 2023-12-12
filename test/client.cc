@@ -104,7 +104,7 @@ MyPacket decodeRecPacket(const string &packet)
 // #pragma comment(lib, "ws2_32.lib")
 // g++ test.cc -lwsock32
 
-SOCKET clientSocket;
+SOCKET _clientSocket;
 sockaddr_in _serverAddr; // server information
 pthread_t _tid;
 
@@ -170,7 +170,9 @@ int main()
             cout << "* 2. Exit                  *" << endl;
             cout << "****************************" << endl;
             cout << "$ Please input your choice: \n>> ";
-            cin >> _choice;
+            // cin >> _choice;
+            fflush(stdin);
+            scanf("%d", &_choice);
             if (_choice == 1)
             {
                 // Connect to server
@@ -196,7 +198,9 @@ int main()
             cout << "* 6. Exit                  *" << endl;
             cout << "****************************" << endl;
             cout << "Please input your choice: \n>> ";
-            cin >> _choice;
+            // cin >> _choice;
+            fflush(stdin);
+            scanf("%d", &_choice);
             if (_choice >= 1 && _choice <= 4)
             {
                 // Request time | Name | Clients List | Send message
@@ -232,6 +236,7 @@ bool ConnectServer()
     cout << "Please input server IP (Default: 127.0.0.1): \n>> ";
     string server_ip;
     cin >> server_ip;
+    cout << "Server IP: " << server_ip << endl;
     // clean buffer
     cin.clear();
 
@@ -251,11 +256,13 @@ bool ConnectServer()
     cout << "Server Port: " << ntohs(_serverAddr.sin_port) << endl;
 
     // Connect to server
-    if (connect(clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
+    // int ret = connect(_clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr));
+    // cout << ret;
+    if (connect(_clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
     {
         cout << "\033[31mConnect to server failed!\033[0m" << endl;
-        closesocket(clientSocket);
-        // 打印错误信息
+
+        // Print Error information
         DWORD dwError=WSAGetLastError();
         LPVOID lpMsgBuf;
         FormatMessage(
@@ -267,6 +274,9 @@ bool ConnectServer()
             0,
             NULL);
         cout << (char*)lpMsgBuf << endl;
+        LocalFree(lpMsgBuf);
+
+        closesocket(_clientSocket);
         WSACleanup();
         return false;
     }
@@ -276,7 +286,7 @@ bool ConnectServer()
         isConnect = true;
 
         // Create sub thread to receive message
-        if (pthread_create(&_tid, NULL, ReceiveMessage, &clientSocket) != 0)
+        if (pthread_create(&_tid, NULL, ReceiveMessage, &_clientSocket) != 0)
         {
             cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
             return false;
@@ -285,7 +295,7 @@ bool ConnectServer()
         // Send a package for connecting successfully
         MyPacket send_pack(CONNECT); // connect
         string send_pstr = send_pack.Package();
-        send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+        send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
     }
     return true;
 }
@@ -301,10 +311,10 @@ void CloseConnect()
     // Send a package for closing connection
     MyPacket send_pack = MyPacket(CLOSE); // close
     string send_pstr = send_pack.Package();
-    send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
     // Close connection
-    closesocket(clientSocket);
+    closesocket(_clientSocket);
     WSACleanup();
     isConnect = false;
 
@@ -339,7 +349,7 @@ void SendInfo(uint8_t type)
     // Send the message
     MyPacket send_pack = MyPacket(type, dest_client_id, buf);
     string send_pstr = send_pack.Package();
-    send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
     // Lock mutex
     LockOrNot(LOCK);

@@ -6,8 +6,15 @@
 #include <map>
 #include <pthread.h>
 #include <unistd.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
+// #include <winsock2.h>
+// #include <ws2tcpip.h>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <netdb.h>
+
 using namespace std;
 
 #define SERVERPORT 1638 

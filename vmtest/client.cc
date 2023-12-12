@@ -3,9 +3,17 @@
 #include <iostream>
 #include <time.h>
 #include <pthread.h>
-#include <winsock2.h>
-#include <windows.h>
+// #include <winsock2.h>
+// #include <windows.h>
 #include <string>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <netdb.h>
+
+ 
 // #include "../myPacket/mypacket.hh"
 
 using namespace std;
