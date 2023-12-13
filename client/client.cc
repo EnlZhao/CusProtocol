@@ -6,36 +6,31 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <string>
+#include <bitset>
 #include "../myPacket/mypacket.hh"
 
+#pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
 #define LOCK true
 #define UNLOCK false
 
-// #pragma comment(lib, "ws2_32.lib")
-// g++ test.cc -lwsock32
-
-SOCKET clientSocket;
+SOCKET _clientSocket;
 sockaddr_in _serverAddr; // server information
 pthread_t _tid;
 
-
-static bool isConnect = false;
-static bool _islock = false;
+bool isConnect = false;
+bool _islock = false;
 pthread_mutex_t _mutex;
 
 //! \brief Connect to server
-bool ConnectServer();
+void ConnectServer();
 
 //! \brief Close connection
-void CloseConnect();
+void CloseConnect(uint8_t type);
 
 //! \brief Send request to server or message to other clients
 void SendInfo(uint8_t type);
-
-//! \brief Request time
-// void RequestInfo();
 
 //! \brief Exit the program
 void ExitProg();
@@ -63,14 +58,6 @@ int main()
         return 0;
     }
 
-    // Initialize - Apply for socket
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(sock == INVALID_SOCKET)
-    {
-        cout << "\033[31mInitialize Socket failed!\033[0m" << endl;
-        return 0;
-    }
-
     while (true)
     {   
         uint16_t _choice;
@@ -82,7 +69,9 @@ int main()
             cout << "* 2. Exit                  *" << endl;
             cout << "****************************" << endl;
             cout << "$ Please input your choice: \n>> ";
-            cin >> _choice;
+            // cin >> _choice;
+            fflush(stdin);
+            scanf("%d", &_choice);
             if (_choice == 1)
             {
                 // Connect to server
@@ -100,6 +89,7 @@ int main()
         }
         else
         {
+            pthread_mutex_lock(&_mutex);
             cout << "* 1. Request time          *" << endl;
             cout << "* 2. Request Name          *" << endl;
             cout << "* 3. Request Clients List  *" << endl;
@@ -107,17 +97,25 @@ int main()
             cout << "* 5. Close connection      *" << endl;
             cout << "* 6. Exit                  *" << endl;
             cout << "****************************" << endl;
-            cout << "Please input your choice: \n>> ";
-            cin >> _choice;
+            cout << "Please input your choice: \n";
+            pthread_mutex_unlock(&_mutex);
+
+            // cin >> _choice;
+            // pthread_mutex_lock(&_mutex);
+            fflush(stdin);
+            cout << ">> " ;
+            scanf("%d", &_choice);
+            // pthread_mutex_unlock(&_mutex);
+            
             if (_choice >= 1 && _choice <= 4)
             {
                 // Request time | Name | Clients List | Send message
-                SendInfo(static_cast<uint8_t>(_choice) + 2 << 4);
+                SendInfo(static_cast<uint8_t>(_choice) + 3 << 4);
             }
             else if (_choice == 5)
             {
                 // Close connection
-                CloseConnect();
+                CloseConnect(CLOSE);
             }
             else if (_choice == 6)
             {
@@ -133,24 +131,33 @@ int main()
     }
 }
 
-bool ConnectServer()
+void ConnectServer()
 {
     if (isConnect)
     {
         cout << "\033[32mYou have already connected to server!\033[0m" << endl;
-        return true;
+        return ;
+    }
+    // Initialize - Apply for socket
+    _clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(_clientSocket == INVALID_SOCKET)
+    {
+        cout << "\033[31mInitialize Socket failed!\033[0m" << endl;
+        return ;
     }
 
-    cout << "Please input server IP (Default: 127.0.0.1): \n>> ";
+    cout << "\nPlease input server IP (Default: 127.0.0.1): \n>> ";
     string server_ip;
     cin >> server_ip;
     // clean buffer
+    cin.sync();
     cin.clear();
 
-    cout << "Please input server port (Default: 3210): \n>> ";
+    cout << "\nPlease input server port (Default: 3210): \n>> ";
     uint16_t server_port;
     cin >> server_port;
     // clean buffer
+    cin.sync();
     cin.clear();
 
     // Initialize - Set server address
@@ -158,17 +165,31 @@ bool ConnectServer()
     _serverAddr.sin_port = htons(server_port);
     _serverAddr.sin_addr.S_un.S_addr = inet_addr(server_ip.c_str());
 
-    // // print _serverAddr
+    // // Debug info
     // cout << "Server IP: " << inet_ntoa(_serverAddr.sin_addr) << endl;
     // cout << "Server Port: " << ntohs(_serverAddr.sin_port) << endl;
 
     // Connect to server
-    if (connect(clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
+    if (connect(_clientSocket, (sockaddr*)&_serverAddr, sizeof(_serverAddr)) == SOCKET_ERROR)
     {
-        cout << "\033[31mConnect to server failed!\033[0m" << endl;
-        closesocket(clientSocket);
-        WSACleanup();
-        return false;
+        cout << "\033[31mConnect to server failed!" << endl;
+
+        // Print Error information
+        DWORD dwError=WSAGetLastError();
+        LPVOID lpMsgBuf;
+        FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
+            NULL,
+            dwError,
+            MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),
+            (LPTSTR)&lpMsgBuf,
+            0,
+            NULL);
+        cout << (char*)lpMsgBuf << "\033[0m" << endl;
+        LocalFree(lpMsgBuf);
+
+        closesocket(_clientSocket);
+        return ;
     }
     else
     {
@@ -176,21 +197,37 @@ bool ConnectServer()
         isConnect = true;
 
         // Create sub thread to receive message
-        if (pthread_create(&_tid, NULL, ReceiveMessage, &clientSocket) != 0)
+        if (pthread_create(&_tid, NULL, ReceiveMessage, &_clientSocket) != 0)
         {
             cout << "\033[31mCreate sub thread failed!\033[0m" << endl;
-            return false;
+            return ;
         }
 
         // Send a package for connecting successfully
-        MyPacket send_pack(CONNECT); // connect
+        cout << "\033[32mSend a package for connecting successfully!\033[0m" << endl;
+
+        MyPacket send_pack(CONNECT, 0x0f, ""); // connect
         string send_pstr = send_pack.Package();
-        send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+
+        // // Debug info
+        // cout << "send_pack type : " << bitset<8>(send_pack.GetType()) << endl;
+        // cout << "send_pack client_id : " << bitset<8>(send_pack.GetClientId()) << endl;
+        // cout << "send_pack message : " << send_pack.GetMessage() << endl;
+        // cout << "send_pstr : " << endl;
+        // // 打印 string 的二进制形式
+        // for (auto i : send_pstr)
+        // {
+        //     bitset<8> bs(i);
+        //     cout << bs << endl;
+        // }
+        // cout << "send_pstr length: " << send_pstr.length() << endl;
+
+        send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
     }
-    return true;
+    return ;
 }
 
-void CloseConnect()
+void CloseConnect(uint8_t type)
 {
     if (!isConnect)
     {
@@ -199,47 +236,56 @@ void CloseConnect()
     }
 
     // Send a package for closing connection
-    MyPacket send_pack = MyPacket(CLOSE); // close
+    MyPacket send_pack = MyPacket(type, 0x0f, ""); // close
     string send_pstr = send_pack.Package();
-    send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
+    closesocket(_clientSocket);
     // Close connection
-    closesocket(clientSocket);
-    WSACleanup();
     isConnect = false;
 
     // Notifies and waits for the sub threads to close
-    if (pthread_join(_tid, NULL) != 0)
-    {
-        cout << "\033[31mClose sub thread failed!\033[0m" << endl;
-        return;
-    }
-
+    pthread_join(_tid, NULL);
+    
     cout << "\033[32mClose connection successfully!\033[0m" << endl;
-
 }
 
 void SendInfo(uint8_t type)
 {
-    uint8_t dest_client_id = 0;
-    string buf = ""; // Max Length - 1021 bytes (1024 - 3)
+    int dest_client_id = 0x0f;
+    char buf[1022]; // Max Length - 1022 bytes (1024 - 2)
     if (type == SEND_MESSAGE)
     {
+        pthread_mutex_lock(&_mutex);
+
         // Input destination client id
-        cout << "Please input destination client id: \n>> ";
+        cout << "\nPlease input destination client id: \n>> ";
         cin >> dest_client_id;
 
-        cin.clear();
+        // // Debug info
+        // cout << "Destination client id: " << dest_client_id << endl;
+
+        if (dest_client_id < 0 || dest_client_id > 15)
+        {
+            cout << "\033[31mInvalid destination client id!\033[0m" << endl;
+            pthread_mutex_unlock(&_mutex);
+            return;
+        }
 
         // Input Message
         // A line feed indicates the end of the inputs
-        cin >> buf;
+        cout << "\nPlease input message: \n>> ";
+        cin.sync();
+        cin.clear();
+        cin.getline(buf, 1022);
+
+        pthread_mutex_unlock(&_mutex);
     }
     
     // Send the message
-    MyPacket send_pack = MyPacket(type, dest_client_id, buf);
+    MyPacket send_pack = MyPacket(type, static_cast<uint8_t>(dest_client_id), buf);
     string send_pstr = send_pack.Package();
-    send(clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
     // Lock mutex
     LockOrNot(LOCK);
@@ -261,7 +307,9 @@ void SendInfo(uint8_t type)
 void ExitProg()
 {
     // Close connection
-    CloseConnect();
+    CloseConnect(EXIT);
+    closesocket(_clientSocket);
+    WSACleanup();
 
     // Exit
     exit(0);
@@ -275,44 +323,44 @@ void *ReceiveMessage(void *arg)
     {
         memset(rep_message, 0, sizeof(rep_message));
         int recv_len = recv(*sock, rep_message, 1024, 0);
+
         if (recv_len == SOCKET_ERROR || !recv_len) // ERROR
         {
             break;
         }
-
         MyPacket recv_pack = decodeRecPacket(rep_message);
-
         auto pack_type = recv_pack.GetType();
-        // 
+
+        pthread_mutex_lock(&_mutex);
         if (pack_type < REQUEST_TIME || pack_type > SEND_MESSAGE)
         {
-            // cout << "\033[31mInvalid packet!\033[0m" << endl;
-            cout << "\033[31m" << recv_pack.GetMessage() << "\033[0m" << endl;
+            // cout << "\033[34m\n$ Receive: " << recv_pack.GetMessage() << "\033[0m\n" << endl;
+            pthread_mutex_unlock(&_mutex); 
             continue;
         }
 
         if (pack_type == REQUEST_TIME)
         {
             // Request time
-            cout << "\033[32mCurrent Server Time: \033[0m" << recv_pack.GetMessage() << endl;
+            cout << "\033[34m\n$ Current Server Time: \033[0m" << recv_pack.GetMessage() << endl << endl;
         }
         else if (pack_type == REQUEST_SERVER_NAME)
         {
             // Request Name
-            cout << "\033[32mClient Name: \033[0m" << recv_pack.GetMessage() << endl;
+            cout << "\033[34m\n$ Client Name: \033[0m" << recv_pack.GetMessage() << endl << endl;
         }
         else if (pack_type == REQUEST_CLIENTS_LIST)
         {
             // Request Clients List
-            cout << "\033[32mCurrent Clients List: \033[0m" << endl;
-            cout << recv_pack.GetMessage() << endl;
+            cout << "\033[34m\n$ Current Clients List: \033[0m\n" << recv_pack.GetMessage() << endl << endl;
         }
         else if (pack_type == SEND_MESSAGE)
         {
             // Send message
-            cout << "\033[32mMessage: \033[0m" << endl;
-            cout << recv_pack.GetMessage() << endl;
+            cout << "\033[34m\n$ Receive Message: \033[0m\n" << recv_pack.GetMessage() << endl << endl;
+            cout << ">> ";
         }
+        pthread_mutex_unlock(&_mutex); 
         LockOrNot(UNLOCK);   
     }
     return NULL;

@@ -8,18 +8,20 @@
 #include <unistd.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+// #include <bitset>
 #include "../myPacket/mypacket.hh"
 
+#pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
 #define SERVERPORT 1638 
 #define MAXLISTEN 12
 
-typedef uint8_t id; // 0 - 0x0f
+typedef uint16_t id; // 0 - 0x0f (0x0f represents invalid!)
 typedef string ip_addr;
 typedef uint16_t port;
 typedef bool occupied;
-id _idQueue = 0;
+id _idQueue = 0; // 0 - 0x0e
 
 SOCKET _sockfd;
 pthread_mutex_t _mutex;
@@ -42,11 +44,33 @@ void *SubThread(void *arg);
 
 int main()
 {
+    WSADATA wsaData;
+
+    // Initialize WinSock
+    if(WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+        cout << "\033[31mWSAStartup failed! Expect WinSock DLL version 2.2!\033[0m" << endl;
+        return 0;
+    }
+
     // Initialize
     _sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (_sockfd == -1)
     {
-        cout << "\033[31mFail to create a socket.\033[0m" << endl;
+        cout << "\033[31mFail to create a socket." << endl;
+        // Print error information
+        DWORD dwError=WSAGetLastError();
+        LPVOID lpMsgBuf;
+        FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
+            NULL,
+            dwError,
+            MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),
+            (LPTSTR)&lpMsgBuf,
+            0,
+            NULL);
+        cout << (char*)lpMsgBuf << "\033[0m" << endl;
+
         return -1;
     }
 
@@ -77,9 +101,15 @@ int main()
         SOCKET clientSockfd = accept(_sockfd, (sockaddr *)&clientAddr, (socklen_t *)&clientAddrLen);
         
         pthread_mutex_lock(&_mutex);
+
         // Add to client list
         id clientID = _idQueue;
         _idQueue = (++_idQueue) % 15;
+
+        // // Debug info
+        // cout << "clientID: " << clientID << endl;
+        // cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
+
         if (_clientOccupied[clientID])
         {
             while (_clientOccupied[_idQueue] && clientID != _idQueue)
@@ -94,6 +124,10 @@ int main()
             continue;
         }
         _clientOccupied[clientID] = true;
+
+        // // Debug info
+        // cout << "clientID: " << clientID << endl;
+        // cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
         
         ClientInfo clientInfo = ClientInfo(clientID, clientSockfd, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
@@ -126,10 +160,17 @@ void *SubThread(void *arg)
         {
             break;
         }
-        MyPacket recv_pack = decodeRecPacket(rep_message);
+        string rep_message_str = rep_message;
+        MyPacket recv_pack = decodeRecPacket(rep_message_str);
 
         auto pack_type = recv_pack.GetType();
         MyPacket reply_pack;
+
+        // // Debug info
+        // cout << "\n\033[32mReceive: \033[0m" << endl;
+        // cout << "bitset<8>Type: " << bitset<8>(pack_type) << endl;
+        // cout << "Hex Type: " << hex << static_cast<int>(pack_type) << endl;
+
         if (pack_type == REQUEST_TIME)
         {
             time_t rawtime;
@@ -152,13 +193,20 @@ void *SubThread(void *arg)
             string clients_list = "";
             for (auto it = _clientList.begin(); it != _clientList.end(); it++)
             {
-                clients_list += to_string(it->first) + " : " + it->second._clientIP + ":" + to_string(it->second._clientPort) + "\n";
+                // // Debug info
+                // clients_list += "Client Occupied: " + to_string(_clientOccupied[it->first]) + " | ";
+                clients_list += "Client ID: " + to_string(it->first) + " --> " + it->second._clientIP + ":" + to_string(it->second._clientPort) + "\n";
             }
             reply_pack.SetPacket(REQUEST_CLIENTS_LIST, 0x0f, clients_list);
         }
         else if (pack_type == SEND_MESSAGE)
         {
-            id dest_id = recv_pack.GetClientId();
+            id dest_id = static_cast<id>(recv_pack.GetClientId());
+
+            // // Debug info
+            // cout << "dest_id: " << dest_id << endl;
+            // cout << "clientOccupied: " << _clientOccupied[dest_id] << endl;
+
             if (_clientOccupied[dest_id])
             {
                 // Send message
@@ -167,6 +215,7 @@ void *SubThread(void *arg)
                 string message = message_pack.Package();
                 send(it->second._clientSockfd, message.c_str(), message.size(), 0);
                 reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
+                cout << "\033[32mForward the message to Client [" << dest_id <<  "]\033[0m" << endl;
             }
             else // Send back to source client
             {
@@ -175,31 +224,31 @@ void *SubThread(void *arg)
         }
         else if (pack_type == CLOSE)
         {
-            reply_pack.SetPacket(CLOSE, 0x0f, "Close connection");
-            break;
+            reply_pack.SetPacket(CLOSE, 0x0f, "Close Connection!");
+            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
+            // break;
         }
         else if (pack_type == CONNECT)
         {
-            reply_pack.SetPacket(CONNECT, 0x0f, "Connect");
+            reply_pack.SetPacket(CONNECT, 0x0f, "Connected!");
         }
-        else
+        else if(pack_type != EXIT)
         {
             reply_pack.SetPacket(0, 0x0f, "Invalid packet!");
         }
-
-        string reply = reply_pack.Package();
-
-        cout << "\033[32m Reply: \033[0m\n" << reply << endl;
-
-        send(clientSockfd, reply.c_str(), reply.size(), 0);
-
-        if (reply_pack.GetType() == CLOSE)
+        // // Debug info
+        // cout << "\n\033[32mSend: \033[0m\n>>\n" << reply.substr(1, reply.length() - 2) << endl;
+        if (pack_type == CLOSE)
         {
-            cout << "\033[32mClient \033[0m" << clientID << "\033[32m : \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
             break;
         }
-        close(clientSockfd);
-        _clientOccupied[clientID] = false;
+
+        string reply = reply_pack.Package();
+        send(clientSockfd, reply.c_str(), reply.size(), 0);
     }
+    close(clientSockfd);
+    _clientOccupied[clientID] = false;
+    _clientList.erase(clientID);
+    _idQueue = (!_idQueue) ? 14 : _idQueue - 1;
     return NULL;
 }
