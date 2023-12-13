@@ -87,9 +87,18 @@ string MyPacket::Package()
 MyPacket decodeRecPacket(const string &packet)
 {
     MyPacket myPacket;
-    if (packet.length() < 2 || packet[packet.length() - 1] != ENDSIGNAL)
+    if (packet.length() < 2 || static_cast<uint8_t>(packet[packet.length() - 1]) != ENDSIGNAL)
     {
         // Print bit type of packet
+        cout << "\ndecode invalid packet: " << endl; 
+        if (packet.length() < 2)
+        {
+            cout << "Error: packet.length() < 2" << endl;
+        }
+        else
+        {
+            cout << "packet[packet.length() - 1] != ENDSIGNAL" << endl;
+        }
         cout << "packet[0]: " << bitset<8>(packet[0]) << endl;
         cout << "length: " << packet.length() << endl;
         cout << "packet[final]: " << bitset<8>(packet[packet.length() - 1]) << endl;
@@ -100,7 +109,7 @@ MyPacket decodeRecPacket(const string &packet)
     }
     
     const size_t _len = (packet.length() > MAXLEN) ? MAXLEN : packet.length();
-    myPacket.SetPacket(static_cast<uint8_t>(packet[0] & 0xf0), static_cast<uint8_t>(packet[0] & 0x0f), packet.substr(2, _len - 2));
+    myPacket.SetPacket(static_cast<uint8_t>(packet[0] & 0xf0), static_cast<uint8_t>(packet[0] & 0x0f), packet.substr(1, _len - 2));
 
     return myPacket;
 }
@@ -109,7 +118,7 @@ MyPacket decodeRecPacket(const string &packet)
 
 /////////////////////////////
 
-typedef uint8_t id; // 0 - 0x0f
+typedef uint16_t id; // 0 - 0x0f
 typedef string ip_addr;
 typedef uint16_t port;
 typedef bool occupied;
@@ -197,6 +206,8 @@ int main()
         // Add to client list
         id clientID = _idQueue;
         _idQueue = (++_idQueue) % 15;
+        cout << "clientID: " << clientID << endl;
+        cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
         if (_clientOccupied[clientID])
         {
             while (_clientOccupied[_idQueue] && clientID != _idQueue)
@@ -211,12 +222,14 @@ int main()
             continue;
         }
         _clientOccupied[clientID] = true;
+
+        cout << "clientID: " << clientID << endl;
+        cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
         
         ClientInfo clientInfo = ClientInfo(clientID, clientSockfd, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
 
         cout << "\033[32mClient \033[0m" << clientID <<  "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connect successfully!\033[0m" << endl;
-        
         pthread_mutex_unlock(&_mutex);
 
         // Create sub thread to receive message
@@ -244,10 +257,15 @@ void *SubThread(void *arg)
         {
             break;
         }
-        MyPacket recv_pack = decodeRecPacket(rep_message);
+        string rep_message_str = rep_message;
+        MyPacket recv_pack = decodeRecPacket(rep_message_str);
 
         auto pack_type = recv_pack.GetType();
         MyPacket reply_pack;
+
+        cout << "\n\033[32mReceive: \033[0m" << endl;
+        cout << "bitset<8>Type: " << bitset<8>(pack_type) << endl;
+        cout << "Hex Type: " << hex << static_cast<int>(pack_type) << endl;
 
         if (pack_type == REQUEST_TIME)
         {
@@ -271,13 +289,16 @@ void *SubThread(void *arg)
             string clients_list = "";
             for (auto it = _clientList.begin(); it != _clientList.end(); it++)
             {
-                clients_list += to_string(it->first) + " : " + it->second._clientIP + ":" + to_string(it->second._clientPort) + "\n";
+                clients_list += "Client Occupied: " + to_string(_clientOccupied[it->first]) + " | ";
+                clients_list += "Client ID: " + to_string(it->first) + " --> " + it->second._clientIP + ":" + to_string(it->second._clientPort) + "\n";
             }
             reply_pack.SetPacket(REQUEST_CLIENTS_LIST, 0x0f, clients_list);
         }
         else if (pack_type == SEND_MESSAGE)
         {
-            id dest_id = recv_pack.GetClientId();
+            id dest_id = static_cast<id>(recv_pack.GetClientId());
+            cout << "dest_id: " << dest_id << endl;
+            cout << "clientOccupied: " << _clientOccupied[dest_id] << endl;
             if (_clientOccupied[dest_id])
             {
                 // Send message
@@ -308,13 +329,13 @@ void *SubThread(void *arg)
 
         string reply = reply_pack.Package();
 
-        cout << "\033[32mReply: \033[0m\n" << reply << endl;
+        cout << "\n\033[32mReply: \033[0m\n>>\n" << reply.substr(1, reply.length() - 2) << endl;
 
         send(clientSockfd, reply.c_str(), reply.size(), 0);
 
         if (reply_pack.GetType() == CLOSE)
         {
-            cout << "\033[32mClient \033[0m" << clientID << "\033[32m : \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
+            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
             break;
         }
         close(clientSockfd);

@@ -84,9 +84,18 @@ string MyPacket::Package()
 MyPacket decodeRecPacket(const string &packet)
 {
     MyPacket myPacket;
-    if (packet.length() < 2 || packet[packet.length() - 1] != ENDSIGNAL)
+    if (packet.length() < 2 || static_cast<uint8_t>(packet[packet.length() - 1]) != ENDSIGNAL)
     {
         // Print bit type of packet
+        cout << "\ndecode invalid packet: " << endl; 
+        if (packet.length() < 2)
+        {
+            cout << "Error: packet.length() < 2" << endl;
+        }
+        else
+        {
+            cout << "packet[packet.length() - 1] != ENDSIGNAL" << endl;
+        }
         cout << "packet[0]: " << bitset<8>(packet[0]) << endl;
         cout << "length: " << packet.length() << endl;
         cout << "packet[final]: " << bitset<8>(packet[packet.length() - 1]) << endl;
@@ -97,10 +106,11 @@ MyPacket decodeRecPacket(const string &packet)
     }
     
     const size_t _len = (packet.length() > MAXLEN) ? MAXLEN : packet.length();
-    myPacket.SetPacket(static_cast<uint8_t>(packet[0] & 0xf0), static_cast<uint8_t>(packet[0] & 0x0f), packet.substr(2, _len - 2));
+    myPacket.SetPacket(static_cast<uint8_t>(packet[0] & 0xf0), static_cast<uint8_t>(packet[0] & 0x0f), packet.substr(1, _len - 2));
 
     return myPacket;
 }
+
 
 
 /////////////////////////////
@@ -111,7 +121,7 @@ MyPacket decodeRecPacket(const string &packet)
 // #pragma comment(lib, "ws2_32.lib")
 // g++ test.cc -lwsock32
 
-SOCKET _clientSosket;
+SOCKET _clientSocket;
 sockaddr_in _serverAddr; // server information
 pthread_t _tid;
 
@@ -355,23 +365,43 @@ void CloseConnect()
 
 void SendInfo(uint8_t type)
 {
-    uint8_t dest_client_id = 0;
+    int dest_client_id = 0x0f;
     string buf = ""; // Max Length - 1021 bytes (1024 - 3)
     if (type == SEND_MESSAGE)
     {
+        pthread_mutex_lock(&_mutex);
+
         // Input destination client id
         cout << "Please input destination client id: \n>> ";
         cin >> dest_client_id;
+        cout << "Destination client id: " << dest_client_id << endl;
+
+        if (dest_client_id < 0 || dest_client_id > 15)
+        {
+            if (dest_client_id < 0)
+            {
+                cout << "Destination client id: " << dest_client_id << "\033[31mless than 0\033[0m" << endl;
+            }
+            else if (dest_client_id > 15)
+            {
+                cout << "Destination client id: " << dest_client_id << "\033[31mgreater than 15\033[0m" << endl;
+            }
+            cout << "\033[31mInvalid destination client id!\033[0m" << endl;
+            pthread_mutex_unlock(&_mutex);
+            return;
+        }
 
         cin.clear();
-
         // Input Message
         // A line feed indicates the end of the inputs
+        cout << "Please input message: \n>> ";
         cin >> buf;
+
+        pthread_mutex_unlock(&_mutex);
     }
     
     // Send the message
-    MyPacket send_pack = MyPacket(type, dest_client_id, buf);
+    MyPacket send_pack = MyPacket(type, static_cast<uint8_t>(dest_client_id), buf);
     string send_pstr = send_pack.Package();
     send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
@@ -418,6 +448,8 @@ void *ReceiveMessage(void *arg)
 
         auto pack_type = recv_pack.GetType();
         // 
+        // pthread_mutex_lock(&_mutex);
+
         if (pack_type < REQUEST_TIME || pack_type > SEND_MESSAGE)
         {
             // cout << "\033[31mInvalid packet!\033[0m" << endl;
@@ -447,6 +479,7 @@ void *ReceiveMessage(void *arg)
             cout << "\033[32mMessage: \033[0m" << endl;
             cout << recv_pack.GetMessage() << endl;
         }
+        // pthread_mutex_unlock(&_mutex); 
         LockOrNot(UNLOCK);   
     }
     return NULL;
