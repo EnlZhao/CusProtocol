@@ -1,16 +1,15 @@
 #pragma once
 #include <iostream>
 #include <string>
-
-#define SEPERATOR 0b11111111
-#define ENDSIGNAL 0b00000000
+#define ENDSIGNAL 0b11111111
 #define MAXLEN 1024
 #define CONNECT 0x10
 #define CLOSE 0x20
-#define REQUEST_TIME 0x30
-#define REQUEST_SERVER_NAME 0x40
-#define REQUEST_CLIENTS_LIST 0x50
-#define SEND_MESSAGE 0x60
+#define EXIT 0x30
+#define REQUEST_TIME 0x40
+#define REQUEST_SERVER_NAME 0x50
+#define REQUEST_CLIENTS_LIST 0x60
+#define SEND_MESSAGE 0x70
 
 class MyPacket
 {
@@ -24,10 +23,11 @@ private:
     +---0x00 Error
     +---0x10 Connect
     +---0x20 Close
-    +---0x30 Request Time
-    +---0x40 Request Server Name
-    +---0x50 Request Clients List
-    +---0x60 Send Message
+    +---0x30 Exit
+    +---0x40 Request Time
+    +---0x50 Request Server Name
+    +---0x60 Request Clients List
+    +---0x70 Send Message
     */
     uint8_t _type;
 

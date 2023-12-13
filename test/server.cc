@@ -19,13 +19,13 @@ using namespace std;
 #include <string>
 #define ENDSIGNAL 0b11111111
 #define MAXLEN 1024
-// #define ERROR 0x00
 #define CONNECT 0x10
 #define CLOSE 0x20
-#define REQUEST_TIME 0x30
-#define REQUEST_SERVER_NAME 0x40
-#define REQUEST_CLIENTS_LIST 0x50
-#define SEND_MESSAGE 0x60
+#define EXIT 0x30
+#define REQUEST_TIME 0x40
+#define REQUEST_SERVER_NAME 0x50
+#define REQUEST_CLIENTS_LIST 0x60
+#define SEND_MESSAGE 0x70
 
 class MyPacket
 {
@@ -39,10 +39,11 @@ private:
     +---0x00 Error
     +---0x10 Connect
     +---0x20 Close
-    +---0x30 Request Time
-    +---0x40 Request Server Name
-    +---0x50 Request Clients List
-    +---0x60 Send Message
+    +---0x30 Exit
+    +---0x40 Request Time
+    +---0x50 Request Server Name
+    +---0x60 Request Clients List
+    +---0x70 Send Message
     */
     uint8_t _type;
 
@@ -89,22 +90,13 @@ MyPacket decodeRecPacket(const string &packet)
     MyPacket myPacket;
     if (packet.length() < 2 || static_cast<uint8_t>(packet[packet.length() - 1]) != ENDSIGNAL)
     {
-        // Print bit type of packet
-        cout << "\ndecode invalid packet: " << endl; 
-        if (packet.length() < 2)
-        {
-            cout << "Error: packet.length() < 2" << endl;
-        }
-        else
-        {
-            cout << "packet[packet.length() - 1] != ENDSIGNAL" << endl;
-        }
-        cout << "packet[0]: " << bitset<8>(packet[0]) << endl;
-        cout << "length: " << packet.length() << endl;
-        cout << "packet[final]: " << bitset<8>(packet[packet.length() - 1]) << endl;
-        cout << "packet.length: " << packet.length() << endl;
+        // // Debug info
+        // cout << "packet[0]: " << bitset<8>(packet[0]) << endl;
+        // cout << "length: " << packet.length() << endl;
+        // cout << "packet[final]: " << bitset<8>(packet[packet.length() - 1]) << endl;
+        // cout << "Message: " << packet.substr(2, packet.length() - 3) << endl;
+
         cout << "\033[31mInvalid packet!\033[0m" << endl;
-        cout << "Message: " << packet.substr(2, packet.length() - 3) << endl;
         return MyPacket(0, 0x0f, "Error packet!");
     }
     
@@ -114,15 +106,13 @@ MyPacket decodeRecPacket(const string &packet)
     return myPacket;
 }
 
-
-
 /////////////////////////////
 
-typedef uint16_t id; // 0 - 0x0f
+typedef uint16_t id; // 0 - 0x0f (0x0f represents invalid!)
 typedef string ip_addr;
 typedef uint16_t port;
 typedef bool occupied;
-id _idQueue = 0;
+id _idQueue = 0; // 0 - 0x0e
 
 SOCKET _sockfd;
 pthread_mutex_t _mutex;
@@ -206,8 +196,11 @@ int main()
         // Add to client list
         id clientID = _idQueue;
         _idQueue = (++_idQueue) % 15;
-        cout << "clientID: " << clientID << endl;
-        cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
+
+        // // Debug info
+        // cout << "clientID: " << clientID << endl;
+        // cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
+
         if (_clientOccupied[clientID])
         {
             while (_clientOccupied[_idQueue] && clientID != _idQueue)
@@ -223,8 +216,9 @@ int main()
         }
         _clientOccupied[clientID] = true;
 
-        cout << "clientID: " << clientID << endl;
-        cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
+        // // Debug info
+        // cout << "clientID: " << clientID << endl;
+        // cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
         
         ClientInfo clientInfo = ClientInfo(clientID, clientSockfd, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
@@ -263,9 +257,10 @@ void *SubThread(void *arg)
         auto pack_type = recv_pack.GetType();
         MyPacket reply_pack;
 
-        cout << "\n\033[32mReceive: \033[0m" << endl;
-        cout << "bitset<8>Type: " << bitset<8>(pack_type) << endl;
-        cout << "Hex Type: " << hex << static_cast<int>(pack_type) << endl;
+        // // Debug info
+        // cout << "\n\033[32mReceive: \033[0m" << endl;
+        // cout << "bitset<8>Type: " << bitset<8>(pack_type) << endl;
+        // cout << "Hex Type: " << hex << static_cast<int>(pack_type) << endl;
 
         if (pack_type == REQUEST_TIME)
         {
@@ -289,7 +284,8 @@ void *SubThread(void *arg)
             string clients_list = "";
             for (auto it = _clientList.begin(); it != _clientList.end(); it++)
             {
-                clients_list += "Client Occupied: " + to_string(_clientOccupied[it->first]) + " | ";
+                // // Debug info
+                // clients_list += "Client Occupied: " + to_string(_clientOccupied[it->first]) + " | ";
                 clients_list += "Client ID: " + to_string(it->first) + " --> " + it->second._clientIP + ":" + to_string(it->second._clientPort) + "\n";
             }
             reply_pack.SetPacket(REQUEST_CLIENTS_LIST, 0x0f, clients_list);
@@ -297,8 +293,11 @@ void *SubThread(void *arg)
         else if (pack_type == SEND_MESSAGE)
         {
             id dest_id = static_cast<id>(recv_pack.GetClientId());
-            cout << "dest_id: " << dest_id << endl;
-            cout << "clientOccupied: " << _clientOccupied[dest_id] << endl;
+
+            // // Debug info
+            // cout << "dest_id: " << dest_id << endl;
+            // cout << "clientOccupied: " << _clientOccupied[dest_id] << endl;
+
             if (_clientOccupied[dest_id])
             {
                 // Send message
@@ -307,6 +306,7 @@ void *SubThread(void *arg)
                 string message = message_pack.Package();
                 send(it->second._clientSockfd, message.c_str(), message.size(), 0);
                 reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
+                cout << "\033[32mForward the message to Client [" << dest_id <<  "]\033[0m" << endl;
             }
             else // Send back to source client
             {
@@ -315,31 +315,31 @@ void *SubThread(void *arg)
         }
         else if (pack_type == CLOSE)
         {
-            reply_pack.SetPacket(CLOSE, 0x0f, "Close connection");
-            break;
+            reply_pack.SetPacket(CLOSE, 0x0f, "Close Connection!");
+            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
+            // break;
         }
         else if (pack_type == CONNECT)
         {
-            reply_pack.SetPacket(CONNECT, 0x0f, "Connect");
+            reply_pack.SetPacket(CONNECT, 0x0f, "Connected!");
         }
-        else
+        else if(pack_type != EXIT)
         {
             reply_pack.SetPacket(0, 0x0f, "Invalid packet!");
         }
-
-        string reply = reply_pack.Package();
-
-        cout << "\n\033[32mReply: \033[0m\n>>\n" << reply.substr(1, reply.length() - 2) << endl;
-
-        send(clientSockfd, reply.c_str(), reply.size(), 0);
-
-        if (reply_pack.GetType() == CLOSE)
+        // // Debug info
+        // cout << "\n\033[32mSend: \033[0m\n>>\n" << reply.substr(1, reply.length() - 2) << endl;
+        if (pack_type == CLOSE)
         {
-            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
             break;
         }
-        close(clientSockfd);
-        _clientOccupied[clientID] = false;
+
+        string reply = reply_pack.Package();
+        send(clientSockfd, reply.c_str(), reply.size(), 0);
     }
+    close(clientSockfd);
+    _clientOccupied[clientID] = false;
+    _clientList.erase(clientID);
+    _idQueue = (!_idQueue) ? 14 : _idQueue - 1;
     return NULL;
 }
