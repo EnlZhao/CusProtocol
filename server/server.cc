@@ -5,7 +5,6 @@
 #include <mutex>
 #include <ctime>
 #include <map>
-#include <pthread.h>
 #include <unistd.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -23,7 +22,7 @@ typedef bool occupied;
 id _idQueue = 0; // 0 - 0x0e
 
 SOCKET _sockfd;
-pthread_mutex_t _mutex;
+HANDLE _mutex = CreateMutex(NULL, FALSE, NULL);
 
 struct ClientInfo
 {
@@ -39,7 +38,7 @@ struct ClientInfo
 map<id, ClientInfo> _clientList;
 occupied _clientOccupied[15] = {false};
 
-void *SubThread(void *arg);
+DWORD WINAPI SubThread(LPVOID lpParameter);
 
 int main()
 {
@@ -73,6 +72,7 @@ int main()
         return -1;
     }
 
+    // Input Port
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(SERVERPORT);
@@ -84,6 +84,7 @@ int main()
         cout << "\033[31mFail to bind.\033[0m" << endl;
         return -1;
     }
+    cout << "\033[32m$ Bind Port [1638] successfully!\033[0m" << endl;
 
     // Listen
     if (listen(_sockfd, 20) == -1)
@@ -91,24 +92,28 @@ int main()
         cout << "\033[31mFail to listen.\033[0m" << endl;
         return -1;
     }
+    cout << "\033[32m$ Listening!\033[0m" << endl;
 
     cout << "\033[32mServer is running...\033[0m" << endl;
     while (true)
     {
         sockaddr_in clientAddr;
         int clientAddrLen = sizeof(clientAddr);
+        // Accept connection
         SOCKET clientSockfd = accept(_sockfd, (sockaddr *)&clientAddr, (socklen_t *)&clientAddrLen);
         
-        pthread_mutex_lock(&_mutex);
+        // lock mutex to add to client list correctly 
+        // pthread_mutex_lock(&_mutex);
+        WaitForSingleObject(_mutex, INFINITE);
 
         // Add to client list
         id clientID = _idQueue;
         _idQueue = (++_idQueue) % 15;
-
         // // Debug info
         // cout << "clientID: " << clientID << endl;
         // cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
 
+        // Search for a valid clientID
         if (_clientOccupied[clientID])
         {
             while (_clientOccupied[_idQueue] && clientID != _idQueue)
@@ -123,26 +128,29 @@ int main()
             continue;
         }
         _clientOccupied[clientID] = true;
-
         // // Debug info
         // cout << "clientID: " << clientID << endl;
         // cout << "_clientOccupied[clientID]: " << _clientOccupied[clientID] << endl;
         
+        // Add to client list
         ClientInfo clientInfo = ClientInfo(clientID, clientSockfd, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
 
-        cout << "\033[32mClient \033[0m" << clientID <<  "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connects successfully!\033[0m" << endl;
-        pthread_mutex_unlock(&_mutex);
+        cout << "\033[32mClient \033[0m" << clientID << "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connects successfully!\033[0m" << endl;
+        // pthread_mutex_unlock(&_mutex);
+        ReleaseMutex(_mutex);(&_mutex);
 
         // Create sub thread to receive message
-        pthread_t tid;
-        pthread_create(&tid, NULL, SubThread, &clientInfo);
+        CreateThread(NULL, 0, SubThread, (LPVOID)&clientInfo, 0, NULL);
     }
+    closesocket(_sockfd);
+    WSACleanup();
+    return 0;
 }
 
-void *SubThread(void *arg)
+DWORD WINAPI SubThread(LPVOID lpParameter)
 {
-    ClientInfo clientInfo = *(ClientInfo *)arg;
+    ClientInfo clientInfo = *(ClientInfo *)lpParameter;
 
     SOCKET clientSockfd = clientInfo._clientSockfd;
     ip_addr clientIP = clientInfo._clientIP;
@@ -223,7 +231,6 @@ void *SubThread(void *arg)
         }
         else if (pack_type == CLOSE)
         {
-            reply_pack.SetPacket(CLOSE, 0x0f, "Close Connection!");
             cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnects successfully!\033[0m" << endl;
             // break;
         }
@@ -248,9 +255,9 @@ void *SubThread(void *arg)
         string reply = reply_pack.Package();
         send(clientSockfd, reply.c_str(), reply.size(), 0);
     }
-    close(clientSockfd);
+    closesocket(clientSockfd);
     _clientOccupied[clientID] = false;
     _clientList.erase(clientID);
     _idQueue = (!_idQueue) ? 14 : _idQueue - 1;
-    return NULL;
+    return 0;
 }

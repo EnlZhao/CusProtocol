@@ -1,4 +1,4 @@
-#include "../myPacket/mypacket.hh"
+#include "./myPacket/mypacket.hh"
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
