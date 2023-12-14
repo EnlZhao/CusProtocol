@@ -27,7 +27,7 @@
 ## Usage
 
 - Simply execute the Makefile to compile the program.
-- Run the server first, then run the client. ("server.exe" & "client.exe" both in "exeFile" folder)
+- Run the server first, then run the client. (`server.exe` & `client.exe` both in `exeFile` folder)
 
 ```bash
 $ make all
