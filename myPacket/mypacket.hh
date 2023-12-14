@@ -11,7 +11,7 @@
 #define REQUEST_CLIENTS_LIST 0x60
 #define SEND_MESSAGE 0x70
 
-class MyPacket
+class PerPacket
 {
 private:
 
@@ -37,14 +37,14 @@ private:
 
     std::string _message;
 public:
-    MyPacket() : _type(0), _client_id(0x0f), _message("") {}
-    MyPacket(uint8_t type, uint8_t client_id = 0x0f, std::string message= "") : _type(type), _client_id(client_id), _message(message) { }
+    PerPacket() : _type(0), _client_id(0x0f), _message("") {}
+    PerPacket(uint8_t type, uint8_t client_id = 0x0f, std::string message= "") : _type(type), _client_id(client_id), _message(message) { }
     uint8_t GetType();
     uint8_t GetClientId();
-    std::string GetMessage();
+    std::string GetMessages();
     void SetPacket(uint8_t type, uint8_t client_id = 0x0f, std::string message = "");
     std::string Package();
 };
 
-//! \brief Decode received packet to MyPacket
-MyPacket decodeRecPacket(const std::string& packet);
+//! \brief Decode received packet to PerPacket
+PerPacket decodeRecPacket(const std::string& packet);

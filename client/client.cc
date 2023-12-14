@@ -1,3 +1,4 @@
+#include "../myPacket/mypacket.hh"
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -7,7 +8,6 @@
 #include <windows.h>
 #include <string>
 #include <bitset>
-#include "../myPacket/mypacket.hh"
 
 #pragma comment(lib, "ws2_32.lib")
 using namespace std;
@@ -153,7 +153,7 @@ void ConnectServer()
     cin.sync();
     cin.clear();
 
-    cout << "\nPlease input server port (Default: 3210): \n>> ";
+    cout << "\nPlease input server port (Default: 1638): \n>> ";
     uint16_t server_port;
     cin >> server_port;
     // clean buffer
@@ -206,13 +206,13 @@ void ConnectServer()
         // Send a package for connecting successfully
         cout << "\033[32mSend a package for connecting successfully!\033[0m" << endl;
 
-        MyPacket send_pack(CONNECT, 0x0f, ""); // connect
+        PerPacket send_pack(CONNECT, 0x0f, ""); // connect
         string send_pstr = send_pack.Package();
 
         // // Debug info
         // cout << "send_pack type : " << bitset<8>(send_pack.GetType()) << endl;
         // cout << "send_pack client_id : " << bitset<8>(send_pack.GetClientId()) << endl;
-        // cout << "send_pack message : " << send_pack.GetMessage() << endl;
+        // cout << "send_pack message : " << send_pack.GetMessages() << endl;
         // cout << "send_pstr : " << endl;
         // // 打印 string 的二进制形式
         // for (auto i : send_pstr)
@@ -236,7 +236,7 @@ void CloseConnect(uint8_t type)
     }
 
     // Send a package for closing connection
-    MyPacket send_pack = MyPacket(type, 0x0f, ""); // close
+    PerPacket send_pack = PerPacket(type, 0x0f, ""); // close
     string send_pstr = send_pack.Package();
     send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
@@ -283,7 +283,7 @@ void SendInfo(uint8_t type)
     }
     
     // Send the message
-    MyPacket send_pack = MyPacket(type, static_cast<uint8_t>(dest_client_id), buf);
+    PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
     string send_pstr = send_pack.Package();
     send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
@@ -328,13 +328,13 @@ void *ReceiveMessage(void *arg)
         {
             break;
         }
-        MyPacket recv_pack = decodeRecPacket(rep_message);
+        PerPacket recv_pack = decodeRecPacket(rep_message);
         auto pack_type = recv_pack.GetType();
 
         pthread_mutex_lock(&_mutex);
         if (pack_type < REQUEST_TIME || pack_type > SEND_MESSAGE)
         {
-            // cout << "\033[34m\n$ Receive: " << recv_pack.GetMessage() << "\033[0m\n" << endl;
+            // cout << "\033[34m\n$ Receive: " << recv_pack.GetMessages() << "\033[0m\n" << endl;
             pthread_mutex_unlock(&_mutex); 
             continue;
         }
@@ -342,22 +342,22 @@ void *ReceiveMessage(void *arg)
         if (pack_type == REQUEST_TIME)
         {
             // Request time
-            cout << "\033[34m\n$ Current Server Time: \033[0m" << recv_pack.GetMessage() << endl << endl;
+            cout << "\033[34m\n$ Current Server Time: \033[0m" << recv_pack.GetMessages() << endl << endl;
         }
         else if (pack_type == REQUEST_SERVER_NAME)
         {
             // Request Name
-            cout << "\033[34m\n$ Client Name: \033[0m" << recv_pack.GetMessage() << endl << endl;
+            cout << "\033[34m\n$ Client Name: \033[0m" << recv_pack.GetMessages() << endl << endl;
         }
         else if (pack_type == REQUEST_CLIENTS_LIST)
         {
             // Request Clients List
-            cout << "\033[34m\n$ Current Clients List: \033[0m\n" << recv_pack.GetMessage() << endl << endl;
+            cout << "\033[34m\n$ Current Clients List: \033[0m\n" << recv_pack.GetMessages() << endl << endl;
         }
         else if (pack_type == SEND_MESSAGE)
         {
             // Send message
-            cout << "\033[34m\n$ Receive Message: \033[0m\n" << recv_pack.GetMessage() << endl << endl;
+            cout << "\033[34m\n$ Receive Message: \033[0m\n" << recv_pack.GetMessages() << endl << endl;
             cout << ">> ";
         }
         pthread_mutex_unlock(&_mutex); 

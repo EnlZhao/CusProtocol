@@ -1,5 +1,6 @@
+#include "../myPacket/mypacket.hh"
 #include <iostream>
-#include <cstring>
+#include <string>
 #include <vector>
 #include <mutex>
 #include <ctime>
@@ -9,8 +10,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 // #include <bitset>
-#include "../myPacket/mypacket.hh"
-
 #pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
@@ -132,7 +131,7 @@ int main()
         ClientInfo clientInfo = ClientInfo(clientID, clientSockfd, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
 
-        cout << "\033[32mClient \033[0m" << clientID <<  "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connect successfully!\033[0m" << endl;
+        cout << "\033[32mClient \033[0m" << clientID <<  "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connects successfully!\033[0m" << endl;
         pthread_mutex_unlock(&_mutex);
 
         // Create sub thread to receive message
@@ -161,10 +160,10 @@ void *SubThread(void *arg)
             break;
         }
         string rep_message_str = rep_message;
-        MyPacket recv_pack = decodeRecPacket(rep_message_str);
+        PerPacket recv_pack = decodeRecPacket(rep_message_str);
 
         auto pack_type = recv_pack.GetType();
-        MyPacket reply_pack;
+        PerPacket reply_pack;
 
         // // Debug info
         // cout << "\n\033[32mReceive: \033[0m" << endl;
@@ -211,7 +210,7 @@ void *SubThread(void *arg)
             {
                 // Send message
                 auto it = _clientList.find(dest_id);
-                MyPacket message_pack(SEND_MESSAGE, 0x0f, recv_pack.GetMessage());
+                PerPacket message_pack(SEND_MESSAGE, 0x0f, recv_pack.GetMessages());
                 string message = message_pack.Package();
                 send(it->second._clientSockfd, message.c_str(), message.size(), 0);
                 reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
@@ -225,24 +224,27 @@ void *SubThread(void *arg)
         else if (pack_type == CLOSE)
         {
             reply_pack.SetPacket(CLOSE, 0x0f, "Close Connection!");
-            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnect successfully!\033[0m" << endl;
+            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnects successfully!\033[0m" << endl;
             // break;
         }
         else if (pack_type == CONNECT)
         {
             reply_pack.SetPacket(CONNECT, 0x0f, "Connected!");
         }
-        else if(pack_type != EXIT)
+        else if(pack_type == EXIT)
+        {
+            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m exits successfully!\033[0m" << endl;
+        }
+        else
         {
             reply_pack.SetPacket(0, 0x0f, "Invalid packet!");
         }
         // // Debug info
         // cout << "\n\033[32mSend: \033[0m\n>>\n" << reply.substr(1, reply.length() - 2) << endl;
-        if (pack_type == CLOSE)
+        if (pack_type == CLOSE || pack_type == EXIT)
         {
             break;
         }
-
         string reply = reply_pack.Package();
         send(clientSockfd, reply.c_str(), reply.size(), 0);
     }

@@ -1,19 +1,19 @@
 #include "mypacket.hh"
 
-uint8_t MyPacket::GetType() { return _type; }
+uint8_t PerPacket::GetType() { return _type; }
 
-uint8_t MyPacket::GetClientId() { return _client_id; }
+uint8_t PerPacket::GetClientId() { return _client_id; }
 
-std::string MyPacket::GetMessage() { return _message; }
+std::string PerPacket::GetMessages() { return _message; }
 
-void MyPacket::SetPacket(uint8_t type, uint8_t client_id, std::string message)
+void PerPacket::SetPacket(uint8_t type, uint8_t client_id, std::string message)
 {
     _type = type;
     _client_id = client_id;
     _message = message;
 }
 
-std::string MyPacket::Package()
+std::string PerPacket::Package()
 {
     std::string packet = "";
 
@@ -23,9 +23,9 @@ std::string MyPacket::Package()
     return packet;
 }
 
-MyPacket decodeRecPacket(const std::string &packet)
+PerPacket decodeRecPacket(const std::string &packet)
 {
-    MyPacket myPacket;
+    PerPacket myPacket;
     if (packet.length() < 2 || static_cast<uint8_t>(packet[packet.length() - 1]) != ENDSIGNAL)
     {
         // // Debug info
@@ -35,7 +35,7 @@ MyPacket decodeRecPacket(const std::string &packet)
         // std::cout << "Message: " << packet.substr(2, packet.length() - 3) << std::endl;
 
         std::cout << "\033[31mInvalid packet!\033[0m" << std::endl;
-        return MyPacket(0, 0x0f, "Error packet!");
+        return PerPacket(0, 0x0f, "Error packet!");
     }
     
     const size_t _len = (packet.length() > MAXLEN) ? MAXLEN : packet.length();

@@ -1,19 +1,17 @@
-myPacket.o: myPacket/myPacket.cc myPacket/myPacket.hh
-	g++ -c myPacket/myPacket.cc -o ./myPacket/myPacket.o -lpthread -lwsock32
+myPacket.o: 
+	g++ -c myPacket/myPacket.cc -o ./myPacket/myPacket.o
 
-client.o: myPacket.o
-	g++ -c client/client.cc -o ./client/client.o -lpthread -lwsock32 
+client.o: myPacket.o client/client.cc
+	g++ -c client/client.cc -o ./client/client.o
 
-server.o: myPacket.o
-	g++ -c server/server.cc -o ./server/server.o -lpthread -lwsock32
+server.o: myPacket.o server/server.cc
+	g++ -c server/server.cc -o ./server/server.o
 
-all: client.o server.o
+all: client.o server.o myPacket.o
 	mkdir -p exefile
-	g++ client/client.o myPacket/myPacket.o -o ./exefile/client.exe -lpthread -lwsock32
-	g++ server/server.o myPacket/myPacket.o -o ./exefile/server.exe -lpthread -lwsock32
-	# g++ server.cc -o server.exe -lpthread -lwsock32
-	# g++ client.cc -o client.exe -lpthread -lwsock32
+	g++ myPacket/myPacket.o client/client.o -o ./exefile/client.exe -lpthread -lwsock32
+	g++ myPacket/myPacket.o server/server.o -o ./exefile/server.exe -lpthread -lwsock32
 
 clean:
 	rm -f ./**/*.o
-	rm -f ./**/*.exe
+	rm -f exefile/*
