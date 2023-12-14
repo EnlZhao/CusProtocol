@@ -15,3 +15,7 @@ all: client.o server.o myPacket.o
 clean:
 	rm -f ./**/*.o
 	rm -f exefile/*
+
+help:
+	@echo "make all: compile all files"
+	@echo "make clean: clean all .o files and exefile/*"
