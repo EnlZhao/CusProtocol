@@ -292,9 +292,22 @@ void SendInfo(uint8_t type)
     }
     
     // Send the message
-    PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
-    string send_pstr = send_pack.Package();
-    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    if (type == REQUEST_TIME)
+    {
+        for (int i = 0; i < 100; i++)
+        {
+            PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
+            string send_pstr = send_pack.Package();
+            send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+            Sleep(0);
+        }
+    }
+    else
+    {
+        PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
+        string send_pstr = send_pack.Package();
+        send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    }
 
     // Lock mutex
     LockOrNot(LOCK);

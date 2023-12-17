@@ -136,7 +136,7 @@ int main()
         ClientInfo clientInfo = ClientInfo(clientID, clientSockfd, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
         _clientList.insert(pair<id, ClientInfo>(clientID, clientInfo));
 
-        cout << "\033[32mClient \033[0m" << clientID << "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connects successfully!\033[0m" << endl;
+        cout << "\033[32m[Server]: Client \033[0m" << clientID << "\033[32m : \033[0m" << inet_ntoa(clientAddr.sin_addr) << ":" << ntohs(clientAddr.sin_port) << "\033[32m connects successfully!\033[0m" << endl;
         // pthread_mutex_unlock(&_mutex);
         ReleaseMutex(_mutex);(&_mutex);
 
@@ -187,12 +187,14 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
             info = localtime(&rawtime);
             strftime(buffer, 80, "%Y-%m-%d %H:%M:%S", info);
             reply_pack.SetPacket(REQUEST_TIME, 0x0f, buffer);
+            cout << "\033[32m[Server]: Send time to Client [" << clientID <<  "]\033[0m" << endl;
         }
         else if (pack_type == REQUEST_SERVER_NAME)
         {
             char server_name[80];
             gethostname(server_name, 80);
             reply_pack.SetPacket(REQUEST_SERVER_NAME, 0x0f, server_name);
+            cout << "\033[32m[Server]: Send server name to Client [" << clientID <<  "]\033[0m" << endl;
         }
         else if (pack_type == REQUEST_CLIENTS_LIST)
         {
@@ -205,11 +207,11 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
                 clients_list += "Client ID: " + to_string(it->first) + " --> " + it->second._clientIP + ":" + to_string(it->second._clientPort) + "\n";
             }
             reply_pack.SetPacket(REQUEST_CLIENTS_LIST, 0x0f, clients_list);
+            cout << "\033[32m[Server]: Send clients list to Client [" << clientID <<  "]\033[0m" << endl;
         }
         else if (pack_type == SEND_MESSAGE)
         {
             id dest_id = static_cast<id>(recv_pack.GetClientId());
-
             // // Debug info
             // cout << "dest_id: " << dest_id << endl;
             // cout << "clientOccupied: " << _clientOccupied[dest_id] << endl;
@@ -222,7 +224,7 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
                 string message = message_pack.Package();
                 send(it->second._clientSockfd, message.c_str(), message.size(), 0);
                 reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
-                cout << "\033[32mForward the message to Client [" << dest_id <<  "]\033[0m" << endl;
+                cout << "\033[32m[Server]: Forward the message to Client [" << dest_id <<  "]\033[0m" << endl;
             }
             else // Send back to source client
             {
@@ -231,7 +233,7 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
         }
         else if (pack_type == CLOSE)
         {
-            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnects successfully!\033[0m" << endl;
+            cout << "\033[32m[Server]: Client \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m disconnects successfully!\033[0m" << endl;
             // break;
         }
         else if (pack_type == CONNECT)
@@ -240,7 +242,7 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
         }
         else if(pack_type == EXIT)
         {
-            cout << "\033[32mClient \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m exits successfully!\033[0m" << endl;
+            cout << "\033[32m[Server]: Client \033[0m" << clientID << "\033[32m: \033[0m" << clientIP << ":" << clientPort << "\033[32m exits successfully!\033[0m" << endl;
         }
         else
         {
