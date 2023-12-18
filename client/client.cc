@@ -215,7 +215,13 @@ void ConnectServer()
         // }
         // cout << "send_pstr length: " << send_pstr.length() << endl;
 
-        send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+        // send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+        if (send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0) == SOCKET_ERROR)
+        {
+            cout << "\033[31mSending a package for connecting successfully failed!\033[0m" << endl;
+            closesocket(_clientSocket);
+            return ;
+        }
     }
     return ;
 }
@@ -231,7 +237,13 @@ void CloseConnect(uint8_t type)
     // Send a package for closing connection
     PerPacket send_pack = PerPacket(type, 0x0f, ""); // close
     string send_pstr = send_pack.Package();
-    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    // send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    if (send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0) == SOCKET_ERROR)
+    {
+        cout << "\033[31mSending a package for closing connection failed!\033[0m" << endl;
+        closesocket(_clientSocket);
+        return ;
+    }
 
     if (type == EXIT)
     {
@@ -293,7 +305,13 @@ void SendInfo(uint8_t type)
     // Send the message
     PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
     string send_pstr = send_pack.Package();
-    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    // send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
+    if (send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0) == SOCKET_ERROR)
+    {
+        cout << "\033[31mSending a package failed!\033[0m" << endl;
+        closesocket(_clientSocket);
+        return ;
+    }
 
     // Lock mutex
     LockOrNot(LOCK);

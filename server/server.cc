@@ -259,7 +259,11 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
             break;
         }
         string reply = reply_pack.Package();
-        send(clientSockfd, reply.c_str(), reply.size(), 0);
+        if (send(clientSockfd, reply.c_str(), reply.size(), 0) == SOCKET_ERROR)
+        {
+            cout << "\033[31mFail to send.\033[0m" << endl;
+            break;
+        }
     }
     closesocket(clientSockfd);
     _clientOccupied[clientID] = false;
