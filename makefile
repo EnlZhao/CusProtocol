@@ -13,7 +13,7 @@ all: client.o server.o myPacket.o
 	g++ myPacket/myPacket.o server/server.o -o ./exefile/server.exe -lpthread -lwsock32
 
 clean:
-	rm -f ./**/*.o
+	rm -f **/*.o
 	rm -f exefile/*
 
 help:

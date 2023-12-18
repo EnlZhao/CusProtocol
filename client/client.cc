@@ -61,13 +61,15 @@ int main()
     {   
         uint16_t _choice;
         // Menu       
-        cout << "*********** Menu ***********" << endl;
+        WaitForSingleObject(_mutex, INFINITE);
+        cout << "\n*********** Menu ***********" << endl;
         if(!isConnect)
         {
             cout << "* 1. Connect to server     *" << endl;
             cout << "* 2. Exit                  *" << endl;
             cout << "****************************" << endl;
             cout << "$ Please input your choice: \n>> ";
+            ReleaseMutex(_mutex);
             // cin >> _choice;
             fflush(stdin);
             scanf("%d", &_choice);
@@ -88,8 +90,6 @@ int main()
         }
         else
         {
-            // pthread_mutex_lock(&_mutex);
-            WaitForSingleObject(_mutex, INFINITE);
             cout << "* 1. Request time          *" << endl;
             cout << "* 2. Request Name          *" << endl;
             cout << "* 3. Request Clients List  *" << endl;
@@ -98,7 +98,6 @@ int main()
             cout << "* 6. Exit                  *" << endl;
             cout << "****************************" << endl;
             cout << "Please input your choice: \n";
-            //pthread_mutex_unlock(&_mutex);
             ReleaseMutex(_mutex);
 
             fflush(stdin);
@@ -292,22 +291,9 @@ void SendInfo(uint8_t type)
     }
     
     // Send the message
-    if (type == REQUEST_TIME)
-    {
-        for (int i = 0; i < 100; i++)
-        {
-            PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
-            string send_pstr = send_pack.Package();
-            send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
-            Sleep(0);
-        }
-    }
-    else
-    {
-        PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
-        string send_pstr = send_pack.Package();
-        send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
-    }
+    PerPacket send_pack = PerPacket(type, static_cast<uint8_t>(dest_client_id), buf);
+    string send_pstr = send_pack.Package();
+    send(_clientSocket, send_pstr.c_str(), send_pstr.size(), 0);
 
     // Lock mutex
     LockOrNot(LOCK);
@@ -389,8 +375,7 @@ DWORD WINAPI ReceiveMessage(LPVOID lpParameter)
         else if (pack_type == SEND_MESSAGE)
         {
             // Send message
-            cout << "\033[34m\n$ Receive Message: \033[0m\n" << recv_pack.GetMessages() << endl << endl;
-            cout << ">> ";
+            cout << "\033[34m\n$ Receive Message: \033[0m\n" << recv_pack.GetMessages() << endl << endl << ">> ";
         }
         // pthread_mutex_unlock(&_mutex);
         ReleaseMutex(_mutex); 

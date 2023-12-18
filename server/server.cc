@@ -178,13 +178,11 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
         // cout << "bitset<8>Type: " << bitset<8>(pack_type) << endl;
         // cout << "Hex Type: " << hex << static_cast<int>(pack_type) << endl;
 
-        static int Num = 0;
+        // static int Num = 0;
         if (pack_type == REQUEST_TIME)
         {
-            WaitForSingleObject(_mutex, INFINITE);
-            Num++;
-            cout << "Num [" << Num << "]" << endl;
-            ReleaseMutex(_mutex);
+            // Num++;
+            // cout << "Num [" << Num << "]" << endl;
             
             time_t rawtime;
             struct tm *info;
