@@ -163,8 +163,9 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
     {
         memset(rep_message, 0, 1024);
         int recv_len = recv(clientSockfd, rep_message, 1024, 0);
-        if (recv_len == SOCKET_ERROR || !recv_len)
+        if (recv_len <= 0)
         {
+            cout << "\033[31mClient [" << clientID <<  "] disconnects abnormally!\033[0m" << endl;
             break;
         }
         string rep_message_str = rep_message;
