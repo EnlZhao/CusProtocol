@@ -235,7 +235,7 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
                 }
                 else
                 {
-                    reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
+                    reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message done!");
                     cout << "\033[32m[Server]: Forward the message to Client [" << dest_id <<  "]\033[0m" << endl;
                 }
             }
