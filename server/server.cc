@@ -226,9 +226,17 @@ DWORD WINAPI SubThread(LPVOID lpParameter)
                 auto it = _clientList.find(dest_id);
                 PerPacket message_pack(SEND_MESSAGE, 0x0f, recv_pack.GetMessages());
                 string message = message_pack.Package();
-                send(it->second._clientSockfd, message.c_str(), message.size(), 0);
-                reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
-                cout << "\033[32m[Server]: Forward the message to Client [" << dest_id <<  "]\033[0m" << endl;
+                int ret = send(it->second._clientSockfd, message.c_str(), message.size(), 0);
+                if(ret == SOCKET_ERROR)
+                {
+                    cout << "\033[31mFail to send message to Client [" << dest_id <<  "]\033[0m" << endl;
+                    reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message error!");
+                }
+                else
+                {
+                    reply_pack.SetPacket(SEND_MESSAGE, 0x0f, "Send message successfully!");
+                    cout << "\033[32m[Server]: Forward the message to Client [" << dest_id <<  "]\033[0m" << endl;
+                }
             }
             else // Send back to source client
             {
