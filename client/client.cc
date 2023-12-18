@@ -312,18 +312,23 @@ void SendInfo(uint8_t type)
     // Lock mutex
     LockOrNot(LOCK);
 
+    // Wait for reply
+    int count = 0;
     while(true)
     {
+        if (count++ > 100)
+        {
+            cout << "\033[31mTimeout! No reply!\033[0m" << endl;
+            LockOrNot(UNLOCK);
+            break;
+        }
         // wait for reply
-        // pthread_mutex_lock(&_mutex);
         WaitForSingleObject(_mutex, INFINITE);
         if (!_islock)
         {
-            // pthread_mutex_unlock(&_mutex);
             ReleaseMutex(_mutex);
             break;
         }
-        // pthread_mutex_unlock(&_mutex);
         ReleaseMutex(_mutex);
         Sleep(100);
     }
@@ -358,12 +363,10 @@ DWORD WINAPI ReceiveMessage(LPVOID lpParameter)
         auto pack_type = recv_pack.GetType();
 
         // Lock mutex to print message correctly
-        // pthread_mutex_lock(&_mutex);
         WaitForSingleObject(_mutex, INFINITE);
         if (pack_type < REQUEST_TIME || pack_type > SEND_MESSAGE)   // ERROR
         {
             // cout << "\033[34m\n$ Receive: " << recv_pack.GetMessages() << "\033[0m\n" << endl;
-            // pthread_mutex_unlock(&_mutex);
             ReleaseMutex(_mutex); 
             continue;
         }
